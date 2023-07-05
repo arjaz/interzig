@@ -221,6 +221,66 @@ test "interpret read global" {
     try std.testing.expectEqual(Value.True, vm.stack.items[0]);
 }
 
+test "interpret jump over one instruction" {
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    var chunk = Chunk.init(std.testing.allocator);
+    const indexTrue = try vm.addConstant(.True);
+    _ = try chunk.addInstruction(.{ .Jump = 2 }, 0);
+    _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try chunk.addInstruction(.Return, 0);
+    try vm.chunks.append(chunk);
+
+    try vm.interpret();
+    try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
+test "interpret jump if false with nil on the stack" {
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    var chunk = Chunk.init(std.testing.allocator);
+    const indexNil = try vm.addConstant(.Nil);
+    _ = try chunk.addInstruction(.{ .LoadConstant = indexNil }, 0);
+    _ = try chunk.addInstruction(.{ .JumpIfFalse = 2 }, 0);
+    _ = try chunk.addInstruction(.{ .LoadConstant = indexNil }, 0);
+    _ = try chunk.addInstruction(.Return, 0);
+    try vm.chunks.append(chunk);
+
+    try vm.interpret();
+    try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
+}
+
+test "interpret jump if false with true on the stack" {
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    var chunk = Chunk.init(std.testing.allocator);
+    const indexTrue = try vm.addConstant(.True);
+    _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try chunk.addInstruction(.{ .JumpIfFalse = 2 }, 0);
+    _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try chunk.addInstruction(.Return, 0);
+    try vm.chunks.append(chunk);
+
+    try vm.interpret();
+    try std.testing.expectEqual(@as(usize, 2), vm.stack.items.len);
+}
+
+test "interpert jump back" {
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    var chunk = Chunk.init(std.testing.allocator);
+    _ = try chunk.addInstruction(.{ .Jump = 2 }, 0);
+    _ = try chunk.addInstruction(.Return, 0);
+    _ = try chunk.addInstruction(.{ .JumpBack = 1 }, 0);
+    try vm.chunks.append(chunk);
+
+    try vm.interpret();
+}
+
 const VirtualMachine = struct {
     chunks: std.ArrayList(Chunk),
     stack: std.ArrayList(Value),
@@ -318,6 +378,21 @@ const VirtualMachine = struct {
                 },
                 .LoadObject => |index| {
                     try interpretLoadObject(self, index);
+                },
+                .Jump => |offset| {
+                    // Subtract 1 because the loop will increment the instruction pointer.
+                    ip += offset - 1;
+                },
+                .JumpIfFalse => |offset| {
+                    const value = self.stack.items[self.stack.items.len - 1];
+                    if (value.falsey()) {
+                        // Subtract 1 because the loop will increment the instruction pointer.
+                        ip += offset - 1;
+                    }
+                },
+                .JumpBack => |offset| {
+                    // Adds 1 because the loop will increment the instruction pointer.
+                    ip -= offset + 1;
                 },
                 .Add => {
                     try interpretAdd(self);
@@ -425,6 +500,12 @@ const OpCode = union(enum) {
     LoadConstant: usize,
     // Loads an object from the object pool and pushes it onto the stack.
     LoadObject: usize,
+    // Jumps unconditionally. The jump offset is relative to the current instruction.
+    Jump: u32,
+    // Jumps if the value on the stack is falsey. The jump offset is relative to the current instruction.
+    JumpIfFalse: u32,
+    // Jumps back to the start of the loop (presumably). The jump offset is relative to the current instruction.
+    JumpBack: u32,
     // Checks for strict equality between two values from the stack and pushes the result onto the stack.
     Equal,
     // Checks for strict inequality between two values from the stack and pushes the result onto the stack.
@@ -486,6 +567,15 @@ const Chunk = struct {
                 },
                 .LoadObject => {
                     std.debug.print("{x:4}    {d} load object {d}\n", .{ offset, line, instruction.LoadObject });
+                },
+                .Jump => {
+                    std.debug.print("{x:4}    {d} jump {d}\n", .{ offset, line, instruction.Jump });
+                },
+                .JumpIfFalse => {
+                    std.debug.print("{x:4}    {d} jump if false {d}\n", .{ offset, line, instruction.JumpIfFalse });
+                },
+                .JumpBack => {
+                    std.debug.print("{x:4}    {d} jump back {d}\n", .{ offset, line, instruction.JumpBack });
                 },
                 .Add => {
                     std.debug.print("{x:4}    {d} add\n", .{ offset, line });
