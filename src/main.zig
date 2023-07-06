@@ -13,29 +13,31 @@ pub fn main() !void {
     const mainFnIndex = try vm.addObject(try named_function(allocator, "main", 0));
     const mainFn = &vm.objects.items[mainFnIndex];
 
-    const index0 = try vm.addConstant(.{ .I64 = 42 });
-    const index1 = try vm.addConstant(.{ .I64 = 10 });
-    const objIndex0 = try vm.addObject(try string_from_u8_slice(allocator, "hello world"));
-    const objIndex1 = try vm.addObject(try string_from_u8_slice(allocator, "I love Helga"));
+    const strIndex = try vm.addObject(try string_from_u8_slice(allocator, "I love Helga\n"));
+    const nativePrintStringIndex = try vm.addObject(.{ .Native = .{ .arity = 1, .function = nativePrintString } });
 
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = index0 }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = index1 }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.Add, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.Not, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = index1 }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = objIndex0 }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = objIndex1 }, 0);
+    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = strIndex }, 0);
+    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = nativePrintStringIndex }, 0);
+    _ = try mainFn.Function.chunk.addInstruction(.Call, 0);
     _ = try mainFn.Function.chunk.addInstruction(.Return, 0);
-
-    mainFn.Function.chunk.disassemble("main");
 
     const mainFrame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainFn.Function.chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(mainFrame);
+    _ = try vm.interpret();
 
-    try vm.interpret();
+    // mainFn.Function.chunk.disassemble("main");
+    // vm.printStack();
+    // vm.printObjects();
+}
 
-    vm.printStack();
-    vm.printObjects();
+fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
+    if (arity != 1) {
+        unreachable;
+    }
+    const stringIndex = vm.stack.pop();
+    const string = &vm.objects.items[stringIndex.Object].String;
+    std.debug.print("{s}", .{string.items});
+    return Value.Nil;
 }
 
 test "add i64 constant" {
@@ -365,6 +367,63 @@ test "interpret fn call" {
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
+test "interpret calling 1" {
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    const oneIndex = try vm.addConstant(.{ .U64 = 1 });
+
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    _ = vm.interpret() catch |err| {
+        try std.testing.expectEqual(err, error.TypeMismatch);
+        return;
+    };
+    try std.testing.expect(false);
+}
+
+fn nativeFnTest(vm: *VirtualMachine, arity: usize) Value {
+    var i: usize = 0;
+    while (i < arity) : (i += 1) {
+        _ = vm.stack.pop();
+    }
+    return .True;
+}
+
+test "interpret native fn call" {
+    // A simple function that accepts one argument and returns Value.True.
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+    const oneIndex = try vm.addConstant(.{ .U64 = 1 });
+
+    var nativeFn = .{ .Native = .{
+        .arity = 1,
+        .function = &nativeFnTest,
+    } };
+
+    const nativeFnIndex = try vm.addObject(nativeFn);
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
+    _ = try mainChunk.addInstruction(.{ .LoadObject = nativeFnIndex }, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    const result = try vm.interpret();
+    try std.testing.expectEqual(Value.True, result);
+    try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
 const VirtualMachine = struct {
     frames: std.ArrayList(CallFrame),
     stack: std.ArrayList(Value),
@@ -417,6 +476,9 @@ const VirtualMachine = struct {
                 .Function => |f| {
                     std.debug.print("{x:4}    function/{} \"{s}\"\n", .{ offset, f.arity, f.name.items });
                 },
+                .Native => |n| {
+                    std.debug.print("{x:4}    native/{}\n", .{ offset, n.arity });
+                },
             }
         }
     }
@@ -460,18 +522,35 @@ const VirtualMachine = struct {
                     _ = self.stack.pop();
                 },
                 .Call => {
-                    // TODO: error handling
                     const functionIndex = self.stack.pop();
-                    const function = &self.objects.items[functionIndex.Object];
-                    const newFrame = CallFrame{
-                        .ip = @ptrCast([*]OpCode, &function.Function.chunk.code.items[0]),
-                        .function = function,
-                        .stackBase = self.stack.items.len - function.Function.arity,
+                    const functionObj = switch (functionIndex) {
+                        .Object => |index| &self.objects.items[index],
+                        else => {
+                            std.debug.print("Expected object on the stack\n", .{});
+                            return error.TypeMismatch;
+                        },
                     };
-                    try self.frames.append(newFrame);
-                    frame = &self.frames.items[self.frames.items.len - 1];
-                    // Subtract 1 because the loop will increment the instruction pointer.
-                    frame.ip -= 1;
+                    switch (functionObj.*) {
+                        .Function => |f| {
+                            const newFrame = CallFrame{
+                                .ip = @ptrCast([*]OpCode, &f.chunk.code.items[0]),
+                                .function = functionObj,
+                                .stackBase = self.stack.items.len - f.arity,
+                            };
+                            try self.frames.append(newFrame);
+                            frame = &self.frames.items[self.frames.items.len - 1];
+                            // Subtract 1 because the loop will increment the instruction pointer.
+                            frame.ip -= 1;
+                        },
+                        .Native => |f| {
+                            const result = f.function(self, f.arity);
+                            try self.stack.append(result);
+                        },
+                        else => {
+                            std.debug.print("Expected function on the stack\n", .{});
+                            return error.TypeMismatch;
+                        },
+                    }
                 },
                 .StoreGlobal => |index| {
                     try interpretStoreGlobal(self, index);
@@ -535,6 +614,7 @@ const VirtualMachine = struct {
 const Object = union(enum) {
     String: std.ArrayList(u8),
     Function: struct { arity: u8, chunk: Chunk, name: std.ArrayList(u8) },
+    Native: struct { arity: u8, function: *const fn (*VirtualMachine, usize) Value },
 
     pub fn deinit(self: *Object) void {
         switch (self.*) {
@@ -545,6 +625,7 @@ const Object = union(enum) {
                 self.Function.chunk.deinit();
                 self.Function.name.deinit();
             },
+            .Native => {},
         }
     }
 };
