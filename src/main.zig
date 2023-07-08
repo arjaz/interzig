@@ -10,7 +10,7 @@ pub fn main() !void {
     var vm = try VirtualMachine.init(allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
 
     const strIndex = try vm.addObject(try string_from_u8_slice(allocator, "I love Helga\n"));
@@ -23,11 +23,7 @@ pub fn main() !void {
 
     const mainFrame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainFn.Function.chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(mainFrame);
-    _ = try vm.interpret();
-
-    // mainFn.Function.chunk.disassemble("main");
-    // vm.printStack();
-    // vm.printObjects();
+    _ = try vm.interpret(allocator);
 }
 
 fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
