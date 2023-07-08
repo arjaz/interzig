@@ -701,7 +701,6 @@ const VirtualMachine = struct {
                                             const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
                                             _ = try upvalues.append(upvalue);
                                         } else {
-                                            // TODO: check if the referenced upvalue exists
                                             const upvalue = frame.function.Closure.upvalues.items[u.index];
                                             _ = try upvalues.append(upvalue);
                                         }
@@ -1093,10 +1092,6 @@ fn interpretStoreUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !
             return error.NotAClosure;
         },
     }
-    if (index >= frame.function.Closure.upvalues.items.len) {
-        std.debug.print("Invalid upvalue index\n", .{});
-        return error.InvalidUpvalueIndex;
-    }
     const upvalue = &frame.function.Closure.upvalues.items[index];
     switch (upvalue.*) {
         .Upvalue => |u| {
@@ -1121,10 +1116,6 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
             return error.NotAClosure;
         },
     };
-    if (index >= closure.upvalues.items.len) {
-        std.debug.print("Invalid upvalue index\n", .{});
-        return error.InvalidUpvalueIndex;
-    }
     const upvalue = &closure.upvalues.items[index];
     switch (upvalue.*) {
         .Upvalue => |u| {
@@ -1144,10 +1135,6 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
 /// Stores the value on top of the stack in the global variable at the given index.
 /// Does not pop the value from the stack.
 fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
-    if (index >= vm.constants.items.len) {
-        std.debug.print("Invalid global index\n", .{});
-        return error.InvalidGlobalIndex;
-    }
     const nameIndex = vm.constants.items[index];
     const nameObject = switch (nameIndex) {
         .Object => vm.objects.items[nameIndex.Object],
@@ -1167,10 +1154,6 @@ fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
 }
 
 fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
-    if (index >= vm.constants.items.len) {
-        std.debug.print("Invalid global index\n", .{});
-        return error.InvalidGlobalIndex;
-    }
     const nameIndex = vm.constants.items[index];
     const nameObject = switch (nameIndex) {
         .Object => vm.objects.items[nameIndex.Object],
@@ -1204,19 +1187,11 @@ fn interpretLoadLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !voi
 }
 
 fn interpretLoadConstant(vm: *VirtualMachine, index: usize) !void {
-    if (index >= vm.constants.items.len) {
-        std.debug.print("Invalid constant index\n", .{});
-        return error.InvalidConstantIndex;
-    }
     const v = vm.constants.items[index];
     try vm.stack.append(v);
 }
 
 fn interpretLoadObject(vm: *VirtualMachine, index: usize) !void {
-    if (index >= vm.objects.items.len) {
-        std.debug.print("Invalid object index\n", .{});
-        return error.InvalidObjectIndex;
-    }
     try vm.stack.append(.{ .Object = index });
 }
 
