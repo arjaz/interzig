@@ -62,7 +62,7 @@ test "interpret return" {
 
     const nil = try vm.addConstant(.Nil);
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     _ = try chunk.addInstruction(.{ .LoadConstant = nil }, 0);
@@ -70,7 +70,7 @@ test "interpret return" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -79,7 +79,7 @@ test "interpret constant" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.{ .I64 = 42 });
@@ -88,7 +88,7 @@ test "interpret constant" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value{ .I64 = 42 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -97,7 +97,7 @@ test "interpret 1 + 2" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
@@ -109,7 +109,7 @@ test "interpret 1 + 2" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value{ .I64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -118,7 +118,7 @@ test "interpret 1 - 2" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
@@ -130,7 +130,7 @@ test "interpret 1 - 2" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value{ .I64 = -1 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -139,7 +139,7 @@ test "interpret 10u64 - 7u64" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .U64 = 10 });
@@ -151,7 +151,7 @@ test "interpret 10u64 - 7u64" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value{ .U64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -160,7 +160,7 @@ test "interpret not(nil)" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.Nil);
@@ -170,7 +170,7 @@ test "interpret not(nil)" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -179,7 +179,7 @@ test "interpret not(10.7)" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.{ .F64 = 10.7 });
@@ -189,7 +189,7 @@ test "interpret not(10.7)" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -198,7 +198,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
@@ -210,7 +210,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = vm.interpret() catch |err| {
+    _ = vm.interpret(std.testing.allocator) catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
         return;
     };
@@ -221,7 +221,7 @@ test "interpret set global" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
@@ -233,7 +233,7 @@ test "interpret set global" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
     try std.testing.expectEqual(@as(?Value, .True), vm.globals.get("nice"));
@@ -243,7 +243,7 @@ test "interpret read global" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
@@ -257,7 +257,7 @@ test "interpret read global" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -266,7 +266,7 @@ test "interpret jump over one instruction" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
@@ -277,7 +277,7 @@ test "interpret jump over one instruction" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret();
+    _ = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -285,7 +285,7 @@ test "interpret jump if false with nil on the stack" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexNil = try vm.addConstant(.Nil);
@@ -296,7 +296,7 @@ test "interpret jump if false with nil on the stack" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret();
+    _ = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -304,7 +304,7 @@ test "interpret jump if false with true on the stack" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
@@ -315,7 +315,7 @@ test "interpret jump if false with true on the stack" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret();
+    _ = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
@@ -324,7 +324,7 @@ test "interpert jump back" {
     defer vm.deinit();
 
     const nilIndex = try vm.addConstant(.Nil);
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     _ = try chunk.addInstruction(.{ .Jump = 3 }, 0);
@@ -334,7 +334,7 @@ test "interpert jump back" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -347,13 +347,13 @@ test "interpret fn call" {
 
     const indexTrue = try vm.addConstant(.True);
 
-    const justTrueFnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue", 0));
+    const justTrueFnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue", 0, 0));
     const justTrueFn = &vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
@@ -362,9 +362,157 @@ test "interpret fn call" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
+test "interpert closure call" {
+    // For this we will have a simple function that just returns true.
+    // We will call it from main and expect the result to be true.
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    const indexTrue = try vm.addConstant(.True);
+
+    const justTrueFnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue", 0, 0));
+    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueChunk = &justTrueFn.Function.chunk;
+    _ = try justTrueChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try justTrueChunk.addInstruction(.Return, 0);
+
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
+    _ = try mainChunk.addInstruction(.AsClosure, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    const result = try vm.interpret(std.testing.allocator);
+    try std.testing.expectEqual(Value.True, result);
+    try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
+test "intrepret closure call with an open local upvalue" {
+    // For this we will have a simple function that just returns true from the enclosing scope.
+    // We will call it from main and expect the result to be true.
+    //
+    // fn main() {
+    //     let a = true;
+    //     fn justTrue() {
+    //         return a;
+    //     }
+    //     return justTrue();
+    // }
+    //
+    // justTrue:
+    //   load upvalue 0
+    //   return
+    // main:
+    //   load true
+    //   load justTrue
+    //   as closure
+    //   capture local 0
+    //   call
+    //   return
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    const indexTrue = try vm.addConstant(.True);
+
+    const justTrueFnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue", 0, 1));
+    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueChunk = &justTrueFn.Function.chunk;
+    _ = try justTrueChunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
+    _ = try justTrueChunk.addInstruction(.Return, 0);
+
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
+    _ = try mainChunk.addInstruction(.AsClosure, 0);
+    _ = try mainChunk.addInstruction(.{ .CaptureUpvalue = .{ .local = true, .index = 0 } }, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    const result = try vm.interpret(std.testing.allocator);
+    try std.testing.expectEqual(Value.True, result);
+    // the stack is not empty because we have one local variable in main.
+    try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
+}
+
+test "interpret closure call with an open non-local upvalue" {
+    // The same as the previous test but the upvalue is not local.
+    //
+    // fn main() {
+    //     let a = true;
+    //     fn justTrue() {
+    //         fn justTrue2() {
+    //             return a;
+    //         }
+    //         return justTrue2();
+    //     }
+    //     return justTrue();
+    // }
+    //
+    // justTrue2:
+    //   load upvalue 0
+    //   return
+    // justTrue:
+    //   load justTrue2
+    //   as closure
+    //   capture non-local 0
+    //   call
+    //   return
+    // main:
+    //   load true
+    //   load justTrue
+    //   as closure
+    //   capture local 0
+    //   call
+    //   return
+    var vm = try VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    const indexTrue = try vm.addConstant(.True);
+
+    const justTrue2FnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue2", 0, 1));
+    const justTrue2Fn = &vm.objects.items[justTrue2FnIndex];
+    const justTrue2Chunk = &justTrue2Fn.Function.chunk;
+    _ = try justTrue2Chunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
+    _ = try justTrue2Chunk.addInstruction(.Return, 0);
+
+    const justTrueFnIndex = try vm.addObject(try named_function(std.testing.allocator, "justTrue", 0, 1));
+    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueChunk = &justTrueFn.Function.chunk;
+    _ = try justTrueChunk.addInstruction(.{ .LoadObject = justTrue2FnIndex }, 0);
+    _ = try justTrueChunk.addInstruction(.AsClosure, 0);
+    _ = try justTrueChunk.addInstruction(.{ .CaptureUpvalue = .{ .local = false, .index = 0 } }, 0);
+    _ = try justTrueChunk.addInstruction(.Call, 0);
+    _ = try justTrueChunk.addInstruction(.Return, 0);
+
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
+    _ = try mainChunk.addInstruction(.AsClosure, 0);
+    _ = try mainChunk.addInstruction(.{ .CaptureUpvalue = .{ .local = true, .index = 0 } }, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    const result = try vm.interpret(std.testing.allocator);
+    try std.testing.expectEqual(Value.True, result);
+    // the stack is not empty because we have one local variable in main.
+    try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
 test "interpret calling 1" {
@@ -373,7 +521,7 @@ test "interpret calling 1" {
 
     const oneIndex = try vm.addConstant(.{ .U64 = 1 });
 
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
@@ -382,7 +530,7 @@ test "interpret calling 1" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = vm.interpret() catch |err| {
+    _ = vm.interpret(std.testing.allocator) catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
         return;
     };
@@ -409,7 +557,7 @@ test "interpret native fn call" {
     } };
 
     const nativeFnIndex = try vm.addObject(nativeFn);
-    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0));
+    const mainFnIndex = try vm.addObject(try named_function(std.testing.allocator, "main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
@@ -419,7 +567,7 @@ test "interpret native fn call" {
 
     const frame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret();
+    const result = try vm.interpret(std.testing.allocator);
     try std.testing.expectEqual(Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -479,6 +627,9 @@ const VirtualMachine = struct {
                 .Native => |n| {
                     std.debug.print("{x:4}    native/{}\n", .{ offset, n.arity });
                 },
+                .Closure => |c| {
+                    std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.Function.arity, c.function.Function.name.items });
+                },
             }
         }
     }
@@ -486,7 +637,12 @@ const VirtualMachine = struct {
     pub fn printTrace(self: *VirtualMachine) void {
         std.debug.print("=== Trace ===\n", .{});
         for (self.frames.items) |frame, offset| {
-            std.debug.print("{x:4}    {s}\n", .{ offset, frame.function.Function.name.items });
+            // The function can point to either a Function or a Closure.
+            const function = switch (frame.function) {
+                .Function => frame.function.Function,
+                .Closure => frame.function.Closure.function.Function,
+            };
+            std.debug.print("{x:4}    {s}\n", .{ offset, function.name.items });
         }
     }
 
@@ -500,7 +656,7 @@ const VirtualMachine = struct {
         return self.objects.items.len - 1;
     }
 
-    pub fn interpret(self: *VirtualMachine) !Value {
+    pub fn interpret(self: *VirtualMachine, allocator: std.mem.Allocator) !Value {
         var frame = &self.frames.items[0];
 
         // That is unsafe because we assume there is a return instruction which will be executed.
@@ -521,21 +677,81 @@ const VirtualMachine = struct {
                 .Pop => {
                     _ = self.stack.pop();
                 },
-                .Call => {
-                    const functionIndex = self.stack.pop();
-                    const functionObj = switch (functionIndex) {
+                .AsClosure => {
+                    const fIndex = self.stack.pop();
+                    const fObject = switch (fIndex) {
                         .Object => |index| &self.objects.items[index],
                         else => {
                             std.debug.print("Expected object on the stack\n", .{});
                             return error.TypeMismatch;
                         },
                     };
-                    switch (functionObj.*) {
+
+                    switch (fObject.*) {
+                        .Function => {
+                            var lenUpvalues = fObject.Function.upvalues;
+                            var upvalues = std.ArrayList(Object).init(allocator);
+                            while (lenUpvalues > 0) {
+                                frame.ip += 1;
+                                lenUpvalues -= 1;
+                                switch (frame.ip[0]) {
+                                    .CaptureUpvalue => |u| {
+                                        if (u.local) {
+                                            const value = &self.stack.items[frame.stackBase + u.index];
+                                            const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
+                                            _ = try upvalues.append(upvalue);
+                                        } else {
+                                            // TODO: check if the referenced upvalue exists
+                                            const upvalue = frame.function.Closure.upvalues.items[u.index];
+                                            _ = try upvalues.append(upvalue);
+                                        }
+                                    },
+                                    else => {
+                                        std.debug.print("Expected CaptureUpvalue instruction\n", .{});
+                                        return error.InternalError;
+                                    },
+                                }
+                            }
+                            const cIndex = try self.addObject(.{ .Closure = .{ .function = fObject, .upvalues = upvalues } });
+                            _ = try self.stack.append(.{ .Object = cIndex });
+                        },
+                        else => {
+                            std.debug.print("Expected function on the stack\n", .{});
+                            return error.TypeMismatch;
+                        },
+                    }
+                },
+                .CaptureUpvalue => {
+                    // this is disallowed, the upvalue capture is done in .AsClosure
+                    std.debug.print("Single-standing CaptureUpvalue is disallowed, use AsClosure instead\n", .{});
+                    return error.InternalError;
+                },
+                .Call => {
+                    const fIndex = self.stack.pop();
+                    const fObject = switch (fIndex) {
+                        .Object => |index| &self.objects.items[index],
+                        else => {
+                            std.debug.print("Expected object on the stack\n", .{});
+                            return error.TypeMismatch;
+                        },
+                    };
+                    switch (fObject.*) {
                         .Function => |f| {
                             const newFrame = CallFrame{
                                 .ip = @ptrCast([*]OpCode, &f.chunk.code.items[0]),
-                                .function = functionObj,
+                                .function = fObject,
                                 .stackBase = self.stack.items.len - f.arity,
+                            };
+                            try self.frames.append(newFrame);
+                            frame = &self.frames.items[self.frames.items.len - 1];
+                            // Subtract 1 because the loop will increment the instruction pointer.
+                            frame.ip -= 1;
+                        },
+                        .Closure => |c| {
+                            const newFrame = CallFrame{
+                                .ip = @ptrCast([*]OpCode, &c.function.Function.chunk.code.items[0]),
+                                .function = fObject,
+                                .stackBase = self.stack.items.len - c.function.Function.arity,
                             };
                             try self.frames.append(newFrame);
                             frame = &self.frames.items[self.frames.items.len - 1];
@@ -551,6 +767,12 @@ const VirtualMachine = struct {
                             return error.TypeMismatch;
                         },
                     }
+                },
+                .StoreUpvalue => |index| {
+                    try interpretStoreUpvalue(self, frame, index);
+                },
+                .LoadUpvalue => |index| {
+                    try interpretLoadUpvalue(self, frame, index);
                 },
                 .StoreGlobal => |index| {
                     try interpretStoreGlobal(self, index);
@@ -571,19 +793,13 @@ const VirtualMachine = struct {
                     try interpretLoadObject(self, index);
                 },
                 .Jump => |offset| {
-                    // Subtract 1 because the loop will increment the instruction pointer.
-                    frame.ip += offset - 1;
+                    try interpretJump(frame, offset);
                 },
                 .JumpIfFalse => |offset| {
-                    const value = self.stack.items[self.stack.items.len - 1];
-                    if (value.falsey()) {
-                        // Subtract 1 because the loop will increment the instruction pointer.
-                        frame.ip += offset - 1;
-                    }
+                    try interpretJumpIfFalse(self, frame, offset);
                 },
                 .JumpBack => |offset| {
-                    // Adds 1 because the loop will increment the instruction pointer.
-                    frame.ip -= offset + 1;
+                    try interpretJumpBack(frame, offset);
                 },
                 .Add => {
                     try interpretAdd(self);
@@ -613,8 +829,16 @@ const VirtualMachine = struct {
 
 const Object = union(enum) {
     String: std.ArrayList(u8),
-    Function: struct { arity: u8, chunk: Chunk, name: std.ArrayList(u8) },
+    Function: struct { arity: u8, upvalues: usize, chunk: Chunk, name: std.ArrayList(u8) },
     Native: struct { arity: u8, function: *const fn (*VirtualMachine, usize) Value },
+    Closure: struct { function: *const Object, upvalues: std.ArrayList(Object) },
+    // Upvalues can point to values on the stack or to other upvalues.
+    // Open upvalues are upvalues that point to values on the stack.
+    // Closed upvalues are upvalues that own the values.
+    Upvalue: union(enum) {
+        Open: struct { location: *Value },
+        // Closed: struct { location: Value },
+    },
 
     pub fn deinit(self: *Object) void {
         switch (self.*) {
@@ -626,6 +850,10 @@ const Object = union(enum) {
                 self.Function.name.deinit();
             },
             .Native => {},
+            .Closure => {
+                self.Closure.upvalues.deinit();
+            },
+            .Upvalue => {},
         }
     }
 };
@@ -638,14 +866,16 @@ pub fn string_from_u8_slice(allocator: std.mem.Allocator, slice: []const u8) !Ob
     return .{ .String = string };
 }
 
-pub fn named_function(allocator: std.mem.Allocator, name: []const u8, arity: u8) !Object {
+pub fn named_function(allocator: std.mem.Allocator, name: []const u8, arity: u8, upvalues: usize) !Object {
     var nameF = std.ArrayList(u8).init(allocator);
     for (name) |byte| {
         try nameF.append(byte);
     }
-    return .{ .Function = .{ .arity = arity, .chunk = Chunk.init(allocator), .name = nameF } };
+    return .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(allocator), .name = nameF } };
 }
 
+/// A call frame can refer to a function or a closure.
+/// TODO: it would really be easier to work with if we restricted it to only closures.
 const CallFrame = struct { function: *Object, ip: [*]OpCode, stackBase: usize };
 
 const Value = union(enum) {
@@ -696,8 +926,23 @@ const OpCode = union(enum) {
     Return,
     // Pop a value from the stack.
     Pop,
+    // Turns the function on the top of the stack into a closure.
+    // This instruction is followed by a list of upvalue capture instructions.
+    // The number of instructions is the same as the number of upvalues.
+    AsClosure,
+    // Captures an upvalue.
+    // Local upvalues are captured by index into the stack.
+    // Non-local upvalues are captured by index into the upvalues array in the parent closure.
+    CaptureUpvalue: struct { local: bool, index: usize },
     // Calls a function on the stack. The arguments are on the stack just before the function.
     Call,
+    // Index into the upvalues array in the closure.
+    StoreUpvalue: usize,
+    // Index into the upvalues array in the closure.
+    LoadUpvalue: usize,
+    // Closes an upvalue by moving the value from the stack to the heap by embedding it in the upvalue object.
+    // All the upvalues that precede this one in the upvalues array are also closed.
+    // CloseUpvalue,
     // Stores a value from the top of the stack in a local variable. Index into the name in the constant pool.
     StoreGlobal: usize,
     // Loads a value from a global variable and pushes it onto the stack. Index into the name in the constant pool.
@@ -821,6 +1066,80 @@ const Chunk = struct {
         return self.code.items.len - 1;
     }
 };
+
+fn interpretJumpIfFalse(vm: *VirtualMachine, frame: *CallFrame, offset: u32) !void {
+    const value = vm.stack.items[vm.stack.items.len - 1];
+    if (value.falsey()) {
+        // Subtract 1 because the loop will increment the instruction pointer.
+        frame.ip += offset - 1;
+    }
+}
+
+fn interpretJump(frame: *CallFrame, offset: u32) !void {
+    // Subtracts 1 because the loop will increment the instruction pointer.
+    frame.ip += offset - 1;
+}
+
+fn interpretJumpBack(frame: *CallFrame, offset: u32) !void {
+    // Adds 1 because the loop will increment the instruction pointer.
+    frame.ip -= offset + 1;
+}
+
+fn interpretStoreUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
+    switch (frame.function.*) {
+        .Closure => {},
+        else => {
+            std.debug.print("Invalid closure\n", .{});
+            return error.NotAClosure;
+        },
+    }
+    if (index >= frame.function.Closure.upvalues.items.len) {
+        std.debug.print("Invalid upvalue index\n", .{});
+        return error.InvalidUpvalueIndex;
+    }
+    const upvalue = &frame.function.Closure.upvalues.items[index];
+    switch (upvalue.*) {
+        .Upvalue => |u| {
+            switch (u) {
+                .Open => {
+                    upvalue.Upvalue.Open.location.* = vm.stack.items[vm.stack.items.len - 1];
+                },
+            }
+        },
+        else => {
+            std.debug.print("Invalid upvalue\n", .{});
+            return error.InvalidUpvalue;
+        },
+    }
+}
+
+fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
+    const closure = switch (frame.function.*) {
+        .Closure => frame.function.Closure,
+        else => {
+            std.debug.print("Invalid closure\n", .{});
+            return error.NotAClosure;
+        },
+    };
+    if (index >= closure.upvalues.items.len) {
+        std.debug.print("Invalid upvalue index\n", .{});
+        return error.InvalidUpvalueIndex;
+    }
+    const upvalue = &closure.upvalues.items[index];
+    switch (upvalue.*) {
+        .Upvalue => |u| {
+            switch (u) {
+                .Open => {
+                    try vm.stack.append(upvalue.Upvalue.Open.location.*);
+                },
+            }
+        },
+        else => {
+            std.debug.print("Invalid upvalue\n", .{});
+            return error.InvalidUpvalue;
+        },
+    }
+}
 
 /// Stores the value on top of the stack in the global variable at the given index.
 /// Does not pop the value from the stack.
