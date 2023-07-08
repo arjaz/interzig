@@ -319,7 +319,7 @@ test "interpret jump if false with true on the stack" {
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
-test "interpert jump back" {
+test "interpret jump back" {
     var vm = try VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();
 
@@ -367,7 +367,7 @@ test "interpret fn call" {
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
-test "interpert closure call" {
+test "interpret closure call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
     var vm = try VirtualMachine.init(std.testing.allocator);
@@ -396,7 +396,7 @@ test "interpert closure call" {
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
-test "intrepret closure call with an open local upvalue" {
+test "interpret closure call with an open local upvalue" {
     // For this we will have a simple function that just returns true from the enclosing scope.
     // We will call it from main and expect the result to be true.
     //
