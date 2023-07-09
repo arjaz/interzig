@@ -37,17 +37,25 @@ fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
 }
 
 pub const VirtualMachine = struct {
+    allocator: std.mem.Allocator,
     frames: std.ArrayList(CallFrame),
     stack: std.ArrayList(Value),
     constants: std.ArrayList(Value),
+    // Open upvalues are stored in a separate linked list.
+    // They're sorted by stack slot index, the further you go, the deeper you look into the stack.
+    // They're global as to allow reusing the same upvalues for different closures.
+    // Closing an upvalues means moving it and all preceding upvalues to the heap.
+    upvalues: std.SinglyLinkedList(*Object),
     objects: std.ArrayList(Object),
     globals: std.StringHashMap(Value),
 
     pub fn init(allocator: std.mem.Allocator) !VirtualMachine {
         return VirtualMachine{
+            .allocator = allocator,
             .frames = std.ArrayList(CallFrame).init(allocator),
             .stack = std.ArrayList(Value).init(allocator),
             .constants = std.ArrayList(Value).init(allocator),
+            .upvalues = std.SinglyLinkedList(*Object){},
             .objects = std.ArrayList(Object).init(allocator),
             .globals = std.StringHashMap(Value).init(allocator),
         };
@@ -58,7 +66,7 @@ pub const VirtualMachine = struct {
         self.stack.deinit();
         self.constants.deinit();
         for (self.objects.items) |*object| {
-            object.deinit();
+            object.deinit(self.allocator);
         }
         self.objects.deinit();
         self.globals.deinit();
@@ -120,7 +128,7 @@ pub const VirtualMachine = struct {
         return self.objects.items.len - 1;
     }
 
-    pub fn interpret(self: *VirtualMachine, allocator: std.mem.Allocator) !Value {
+    pub fn interpret(self: *VirtualMachine) !Value {
         var frame = &self.frames.items[0];
 
         // That is unsafe because we assume there is a return instruction which will be executed.
@@ -154,7 +162,7 @@ pub const VirtualMachine = struct {
                     switch (fObject.*) {
                         .Function => {
                             var lenUpvalues = fObject.Function.upvalues;
-                            var upvalues = std.ArrayList(Object).init(allocator);
+                            var upvalues = std.ArrayList(*Object).init(self.allocator);
                             while (lenUpvalues > 0) {
                                 frame.ip += 1;
                                 lenUpvalues -= 1;
@@ -163,10 +171,14 @@ pub const VirtualMachine = struct {
                                         if (u.local) {
                                             const value = &self.stack.items[frame.stackBase + u.index];
                                             const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
-                                            _ = try upvalues.append(upvalue);
+                                            const memory = try self.allocator.create(Object);
+                                            memory.* = upvalue;
+                                            _ = try upvalues.append(memory);
                                         } else {
-                                            const upvalue = frame.function.Closure.upvalues.items[u.index];
-                                            _ = try upvalues.append(upvalue);
+                                            const upvalue = frame.function.Closure.upvalues.items[u.index].*;
+                                            const memory = try self.allocator.create(Object);
+                                            memory.* = upvalue;
+                                            _ = try upvalues.append(memory);
                                         }
                                     },
                                     else => {
@@ -294,16 +306,19 @@ pub const Object = union(enum) {
     String: std.ArrayList(u8),
     Function: struct { arity: u8, upvalues: usize, chunk: Chunk, name: std.ArrayList(u8) },
     Native: struct { arity: u8, function: *const fn (*VirtualMachine, usize) Value },
-    Closure: struct { function: *const Object, upvalues: std.ArrayList(Object) },
-    // Upvalues can point to values on the stack or to other upvalues.
+    Closure: struct {
+        function: *const Object,
+        upvalues: std.ArrayList(*Object),
+    },
+    // Upvalues can point to values on the stack, or they can own the value.
     // Open upvalues are upvalues that point to values on the stack.
     // Closed upvalues are upvalues that own the values.
     Upvalue: union(enum) {
         Open: struct { location: *Value },
-        // Closed: struct { location: Value },
+        Closed: struct { owned: Value },
     },
 
-    pub fn deinit(self: *Object) void {
+    pub fn deinit(self: *Object, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .String => {
                 self.String.deinit();
@@ -314,6 +329,9 @@ pub const Object = union(enum) {
             },
             .Native => {},
             .Closure => {
+                for (self.Closure.upvalues.items) |upvalue| {
+                    allocator.destroy(upvalue);
+                }
                 self.Closure.upvalues.deinit();
             },
             .Upvalue => {},
@@ -404,7 +422,7 @@ pub const OpCode = union(enum) {
     // Index into the upvalues array in the closure.
     LoadUpvalue: usize,
     // Closes an upvalue by moving the value from the stack to the heap by embedding it in the upvalue object.
-    // All the upvalues that precede this one in the upvalues array are also closed.
+    // All the upvalues that point to the same value on the stack are updated to point to the new upvalue object.
     // CloseUpvalue,
     // Stores a value from the top of the stack in a local variable. Index into the name in the constant pool.
     StoreGlobal: usize,
@@ -556,12 +574,15 @@ fn interpretStoreUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !
             return error.NotAClosure;
         },
     }
-    const upvalue = &frame.function.Closure.upvalues.items[index];
+    const upvalue = frame.function.Closure.upvalues.items[index];
     switch (upvalue.*) {
         .Upvalue => |u| {
             switch (u) {
                 .Open => {
                     upvalue.Upvalue.Open.location.* = vm.stack.items[vm.stack.items.len - 1];
+                },
+                .Closed => {
+                    upvalue.Upvalue.Closed.owned = vm.stack.items[vm.stack.items.len - 1];
                 },
             }
         },
@@ -580,12 +601,15 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
             return error.NotAClosure;
         },
     };
-    const upvalue = &closure.upvalues.items[index];
+    const upvalue = closure.upvalues.items[index];
     switch (upvalue.*) {
         .Upvalue => |u| {
             switch (u) {
                 .Open => {
                     try vm.stack.append(upvalue.Upvalue.Open.location.*);
+                },
+                .Closed => {
+                    try vm.stack.append(upvalue.Upvalue.Closed.owned);
                 },
             }
         },

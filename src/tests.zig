@@ -31,7 +31,7 @@ test "interpret return" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -49,7 +49,7 @@ test "interpret constant" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = 42 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -70,7 +70,7 @@ test "interpret 1 + 2" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -91,7 +91,7 @@ test "interpret 1 - 2" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = -1 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -112,7 +112,7 @@ test "interpret 10u64 - 7u64" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .U64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -131,7 +131,7 @@ test "interpret not(nil)" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -150,7 +150,7 @@ test "interpret not(10.7)" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -171,7 +171,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = vm.interpret(std.testing.allocator) catch |err| {
+    _ = vm.interpret() catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
         return;
     };
@@ -194,7 +194,7 @@ test "interpret set global" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
     try std.testing.expectEqual(@as(?main.Value, .True), vm.globals.get("nice"));
@@ -218,7 +218,7 @@ test "interpret read global" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -238,7 +238,7 @@ test "interpret jump over one instruction" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret(std.testing.allocator);
+    _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -257,7 +257,7 @@ test "interpret jump if false with nil on the stack" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret(std.testing.allocator);
+    _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -276,7 +276,7 @@ test "interpret jump if false with true on the stack" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = try vm.interpret(std.testing.allocator);
+    _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
@@ -295,7 +295,7 @@ test "interpret jump back" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -323,7 +323,7 @@ test "interpret fn call" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -352,7 +352,7 @@ test "interpret closure call" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
@@ -402,7 +402,7 @@ test "interpret closure call with an open local upmain.Value" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     // the stack is not empty because we have one local variable in main.
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
@@ -470,7 +470,7 @@ test "interpret closure call with an open non-local upvalue" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     // the stack is not empty because we have one local variable in main.
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
@@ -491,7 +491,7 @@ test "interpret calling 1" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    _ = vm.interpret(std.testing.allocator) catch |err| {
+    _ = vm.interpret() catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
         return;
     };
@@ -528,7 +528,7 @@ test "interpret native fn call" {
 
     const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(frame);
-    const result = try vm.interpret(std.testing.allocator);
+    const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
