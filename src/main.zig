@@ -10,10 +10,10 @@ pub fn main() !void {
     var vm = try VirtualMachine.init(allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try named_function(allocator, "main", 0, 0));
+    const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
     const mainFn = &vm.objects.items[mainFnIndex];
 
-    const strIndex = try vm.addObject(try string_from_u8_slice(allocator, "I love Helga\n"));
+    const strIndex = try vm.addObject(try vm.string_from_u8_slice("I love Helga\n"));
     const nativePrintStringIndex = try vm.addObject(.{ .Native = .{ .arity = 1, .function = nativePrintString } });
 
     _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = strIndex }, 0);
@@ -23,7 +23,7 @@ pub fn main() !void {
 
     const mainFrame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainFn.Function.chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(mainFrame);
-    _ = try vm.interpret(allocator);
+    _ = try vm.interpret();
 }
 
 fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
@@ -318,6 +318,22 @@ pub const VirtualMachine = struct {
             }
         }
     }
+
+    pub fn string_from_u8_slice(self: *VirtualMachine, slice: []const u8) !Object {
+        var string = std.ArrayList(u8).init(self.allocator);
+        for (slice) |byte| {
+            try string.append(byte);
+        }
+        return .{ .String = string };
+    }
+
+    pub fn named_function(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !Object {
+        var nameF = std.ArrayList(u8).init(self.allocator);
+        for (name) |byte| {
+            try nameF.append(byte);
+        }
+        return .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } };
+    }
 };
 
 pub const Object = union(enum) {
@@ -356,22 +372,6 @@ pub const Object = union(enum) {
         }
     }
 };
-
-pub fn string_from_u8_slice(allocator: std.mem.Allocator, slice: []const u8) !Object {
-    var string = std.ArrayList(u8).init(allocator);
-    for (slice) |byte| {
-        try string.append(byte);
-    }
-    return .{ .String = string };
-}
-
-pub fn named_function(allocator: std.mem.Allocator, name: []const u8, arity: u8, upvalues: usize) !Object {
-    var nameF = std.ArrayList(u8).init(allocator);
-    for (name) |byte| {
-        try nameF.append(byte);
-    }
-    return .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(allocator), .name = nameF } };
-}
 
 /// A call frame can refer to a function or a closure.
 /// TODO: it would really be easier to work with if we restricted it to only closures.
