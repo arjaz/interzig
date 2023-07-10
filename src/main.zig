@@ -50,10 +50,11 @@ pub const VirtualMachine = struct {
     globals: std.StringHashMap(Value),
 
     pub fn init(allocator: std.mem.Allocator) !VirtualMachine {
+        const stack = try std.ArrayList(Value).initCapacity(allocator, 1024 * 1024 * 16);
         return VirtualMachine{
             .allocator = allocator,
             .frames = std.ArrayList(CallFrame).init(allocator),
-            .stack = std.ArrayList(Value).init(allocator),
+            .stack = stack,
             .constants = std.ArrayList(Value).init(allocator),
             .upvalues = std.SinglyLinkedList(*Object){},
             .objects = std.ArrayList(Object).init(allocator),
@@ -144,7 +145,7 @@ pub const VirtualMachine = struct {
                     }
                     self.stack.shrinkRetainingCapacity(frame.stackBase);
                     frame = &self.frames.items[self.frames.items.len - 1];
-                    _ = try self.stack.append(result);
+                    _ = self.stack.appendAssumeCapacity(result);
                 },
                 .Pop => {
                     _ = self.stack.pop();
@@ -168,6 +169,7 @@ pub const VirtualMachine = struct {
                                 lenUpvalues -= 1;
                                 switch (frame.ip[0]) {
                                     .CaptureUpvalue => |u| {
+                                        // TODO: check and modify the open upvalues list
                                         if (u.local) {
                                             const value = &self.stack.items[frame.stackBase + u.index];
                                             const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
@@ -188,7 +190,7 @@ pub const VirtualMachine = struct {
                                 }
                             }
                             const cIndex = try self.addObject(.{ .Closure = .{ .function = fObject, .upvalues = upvalues } });
-                            _ = try self.stack.append(.{ .Object = cIndex });
+                            _ = self.stack.appendAssumeCapacity(.{ .Object = cIndex });
                         },
                         else => {
                             std.debug.print("Expected function on the stack\n", .{});
@@ -200,6 +202,22 @@ pub const VirtualMachine = struct {
                     // this is disallowed, the upvalue capture is done in .AsClosure
                     std.debug.print("Single-standing CaptureUpvalue is disallowed, use AsClosure instead\n", .{});
                     return error.InternalError;
+                },
+                .CloseUpvalue => |offset| {
+                    // all upvalues that point to the stack index or above should be closed
+                    // to do that we iterate over the open upvalues linked list and close them one by one
+                    // all while removing them from the linked list
+                    const stackPointer = &self.stack.items[self.stack.items.len - offset - 1];
+                    var it = self.upvalues.first;
+                    while (it) |node| : (it = node.next) {
+                        var upvalue = node.data;
+                        if (@ptrToInt(upvalue.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
+                            upvalue.* = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.Upvalue.Open.location.* } } };
+                            self.upvalues.remove(node);
+                        } else {
+                            break;
+                        }
+                    }
                 },
                 .Call => {
                     const fIndex = self.stack.pop();
@@ -235,7 +253,7 @@ pub const VirtualMachine = struct {
                         },
                         .Native => |f| {
                             const result = f.function(self, f.arity);
-                            try self.stack.append(result);
+                            self.stack.appendAssumeCapacity(result);
                         },
                         else => {
                             std.debug.print("Expected function on the stack\n", .{});
@@ -422,8 +440,9 @@ pub const OpCode = union(enum) {
     // Index into the upvalues array in the closure.
     LoadUpvalue: usize,
     // Closes an upvalue by moving the value from the stack to the heap by embedding it in the upvalue object.
-    // All the upvalues that point to the same value on the stack are updated to point to the new upvalue object.
-    // CloseUpvalue,
+    // All the upvalues upper in the stack are closed as well.
+    // The argument is offset from the top of the stack.
+    CloseUpvalue: usize,
     // Stores a value from the top of the stack in a local variable. Index into the name in the constant pool.
     StoreGlobal: usize,
     // Loads a value from a global variable and pushes it onto the stack. Index into the name in the constant pool.
@@ -606,10 +625,10 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
         .Upvalue => |u| {
             switch (u) {
                 .Open => {
-                    try vm.stack.append(upvalue.Upvalue.Open.location.*);
+                    vm.stack.appendAssumeCapacity(upvalue.Upvalue.Open.location.*);
                 },
                 .Closed => {
-                    try vm.stack.append(upvalue.Upvalue.Closed.owned);
+                    vm.stack.appendAssumeCapacity(upvalue.Upvalue.Closed.owned);
                 },
             }
         },
@@ -661,7 +680,7 @@ fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
         std.debug.print("Undefined global variable\n", .{});
         return error.UndefinedGlobalVariable;
     };
-    try vm.stack.append(value);
+    vm.stack.appendAssumeCapacity(value);
 }
 
 /// Stores the value on top of the stack in the local variable at the given index.
@@ -671,16 +690,16 @@ fn interpretStoreLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !vo
 }
 
 fn interpretLoadLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
-    try vm.stack.append(vm.stack.items[index + frame.stackBase]);
+    vm.stack.appendAssumeCapacity(vm.stack.items[index + frame.stackBase]);
 }
 
 fn interpretLoadConstant(vm: *VirtualMachine, index: usize) !void {
     const v = vm.constants.items[index];
-    try vm.stack.append(v);
+    vm.stack.appendAssumeCapacity(v);
 }
 
 fn interpretLoadObject(vm: *VirtualMachine, index: usize) !void {
-    try vm.stack.append(.{ .Object = index });
+    vm.stack.appendAssumeCapacity(.{ .Object = index });
 }
 
 fn interpretAdd(vm: *VirtualMachine) !void {
@@ -690,7 +709,7 @@ fn interpretAdd(vm: *VirtualMachine) !void {
         .I64 => |a| {
             switch (b_) {
                 .I64 => |b| {
-                    try vm.stack.append(.{ .I64 = a + b });
+                    vm.stack.appendAssumeCapacity(.{ .I64 = a + b });
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
@@ -701,7 +720,7 @@ fn interpretAdd(vm: *VirtualMachine) !void {
         .U64 => |a| {
             switch (b_) {
                 .U64 => |b| {
-                    try vm.stack.append(.{ .U64 = a + b });
+                    vm.stack.appendAssumeCapacity(.{ .U64 = a + b });
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
@@ -723,7 +742,7 @@ fn interpretSub(vm: *VirtualMachine) !void {
         .I64 => |a| {
             switch (b_) {
                 .I64 => |b| {
-                    try vm.stack.append(.{ .I64 = a - b });
+                    vm.stack.appendAssumeCapacity(.{ .I64 = a - b });
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
@@ -734,7 +753,7 @@ fn interpretSub(vm: *VirtualMachine) !void {
         .U64 => |a| {
             switch (b_) {
                 .U64 => |b| {
-                    try vm.stack.append(.{ .U64 = a - b });
+                    vm.stack.appendAssumeCapacity(.{ .U64 = a - b });
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
@@ -756,7 +775,7 @@ fn interpretAddF(vm: *VirtualMachine) !void {
         .F64 => |a| {
             switch (b_) {
                 .F64 => |b| {
-                    try vm.stack.append(.{ .F64 = a + b });
+                    vm.stack.appendAssumeCapacity(.{ .F64 = a + b });
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
@@ -778,7 +797,7 @@ fn interpretSubF(vm: *VirtualMachine) !void {
         .F64 => |a| {
             switch (b_) {
                 .F64 => |b| {
-                    try vm.stack.append(.{ .F64 = a - b });
+                    vm.stack.appendAssumeCapacity(.{ .F64 = a - b });
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
@@ -797,10 +816,10 @@ fn interpretNot(vm: *VirtualMachine) !void {
     const a_ = vm.stack.pop();
     switch (a_) {
         .Nil => {
-            try vm.stack.append(.True);
+            vm.stack.appendAssumeCapacity(.True);
         },
         else => {
-            try vm.stack.append(.Nil);
+            vm.stack.appendAssumeCapacity(.Nil);
         },
     }
 }
@@ -813,13 +832,13 @@ fn interpretEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .U64 => |b| {
                     if (a == b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
@@ -827,13 +846,13 @@ fn interpretEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .I64 => |b| {
                     if (a == b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
@@ -841,33 +860,33 @@ fn interpretEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .F64 => |b| {
                     if (a == b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
         .True => {
             switch (b_) {
                 .True => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
         .Nil => {
             switch (b_) {
                 .Nil => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
@@ -875,13 +894,13 @@ fn interpretEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .Object => |otherIndex| {
                     if (index == otherIndex) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
             }
         },
@@ -896,13 +915,13 @@ fn interpretNotEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .U64 => |b| {
                     if (a != b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
@@ -910,13 +929,13 @@ fn interpretNotEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .I64 => |b| {
                     if (a != b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
@@ -924,33 +943,33 @@ fn interpretNotEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .F64 => |b| {
                     if (a != b) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
         .True => {
             switch (b_) {
                 .True => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
         .Nil => {
             switch (b_) {
                 .Nil => {
-                    try vm.stack.append(.Nil);
+                    vm.stack.appendAssumeCapacity(.Nil);
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
@@ -958,13 +977,13 @@ fn interpretNotEqual(vm: *VirtualMachine) !void {
             switch (b_) {
                 .Object => |otherIndex| {
                     if (index != otherIndex) {
-                        try vm.stack.append(.True);
+                        vm.stack.appendAssumeCapacity(.True);
                     } else {
-                        try vm.stack.append(.Nil);
+                        vm.stack.appendAssumeCapacity(.Nil);
                     }
                 },
                 else => {
-                    try vm.stack.append(.True);
+                    vm.stack.appendAssumeCapacity(.True);
                 },
             }
         },
