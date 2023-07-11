@@ -53,6 +53,7 @@ pub const VirtualMachine = struct {
     // They're global as to allow reusing the same upvalues for different closures.
     // Closing an upvalues means moving it and all preceding upvalues to the heap.
     upvalues: std.SinglyLinkedList(*Object),
+    // That array list is here just to track the allocated memory
     objects: std.ArrayList(*Object),
     globals: std.StringHashMap(Value),
 
@@ -142,7 +143,7 @@ pub const VirtualMachine = struct {
         return self.constants.items.len - 1;
     }
 
-    pub fn addObject(self: *VirtualMachine, object: *Object) !usize {
+    pub fn takeObjectOwnership(self: *VirtualMachine, object: *Object) !usize {
         try self.objects.append(object);
         return self.objects.items.len - 1;
     }
@@ -650,7 +651,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
                 }
             }
             const closure = try vm.closure(fObject, upvalues);
-            _ = try vm.addObject(closure);
+            _ = try vm.takeObjectOwnership(closure);
             _ = vm.stack.appendAssumeCapacity(.{ .Object = closure });
         },
         else => {
