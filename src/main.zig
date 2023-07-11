@@ -35,7 +35,7 @@ fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
         unreachable;
     }
     const stringIndex = vm.stack.pop();
-    const string = &vm.objects.items[stringIndex.Object].String;
+    const string = stringIndex.Object.String;
     std.debug.print("{s}", .{string.items});
     return Value.Nil;
 }
@@ -193,7 +193,7 @@ pub const VirtualMachine = struct {
                 .Call => {
                     const fIndex = self.stack.pop();
                     const fObject = switch (fIndex) {
-                        .Object => |index| self.objects.items[index],
+                        .Object => |o| o,
                         else => {
                             std.debug.print("Expected object on the stack, found: ", .{});
                             fIndex.print();
@@ -378,7 +378,11 @@ pub const Object = union(enum) {
 
 /// A call frame can refer to a function or a closure.
 /// TODO: it would really be easier to work with if we restricted it to only closures.
-pub const CallFrame = struct { function: *Object, ip: [*]OpCode, stackBase: usize };
+pub const CallFrame = struct {
+    function: *Object,
+    ip: [*]OpCode,
+    stackBase: usize,
+};
 
 pub const Value = union(enum) {
     I64: i64,
@@ -386,7 +390,7 @@ pub const Value = union(enum) {
     F64: f64,
     True,
     Nil,
-    Object: usize,
+    Object: *Object,
 
     pub fn print(self: Value) void {
         switch (self) {
@@ -591,7 +595,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
     //       we should probably move the functions to the constant pool
     const fIndex = vm.stack.pop();
     const fObject = switch (fIndex) {
-        .Object => |index| vm.objects.items[index],
+        .Object => |o| o,
         else => {
             std.debug.print("Expected object on the stack\n", .{});
             return error.TypeMismatch;
@@ -615,8 +619,9 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
                     },
                 }
             }
-            const cIndex = try vm.addObject(try vm.closure(fObject, upvalues));
-            _ = vm.stack.appendAssumeCapacity(.{ .Object = cIndex });
+            const closure = try vm.closure(fObject, upvalues);
+            _ = try vm.addObject(closure);
+            _ = vm.stack.appendAssumeCapacity(.{ .Object = closure });
         },
         else => {
             std.debug.print("Expected function on the stack\n", .{});
@@ -740,7 +745,7 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
 fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
     const nameIndex = vm.constants.items[index];
     const nameObject = switch (nameIndex) {
-        .Object => vm.objects.items[nameIndex.Object],
+        .Object => |o| o,
         else => {
             std.debug.print("Invalid global name index\n", .{});
             return error.InvalidGlobalNameIndex;
@@ -759,7 +764,7 @@ fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
 fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
     const nameIndex = vm.constants.items[index];
     const nameObject = switch (nameIndex) {
-        .Object => vm.objects.items[nameIndex.Object],
+        .Object => |o| o,
         else => {
             std.debug.print("Invalid global name index\n", .{});
             return error.InvalidGlobalNameIndex;
@@ -795,7 +800,8 @@ fn interpretLoadConstant(vm: *VirtualMachine, index: usize) !void {
 }
 
 fn interpretLoadObject(vm: *VirtualMachine, index: usize) !void {
-    vm.stack.appendAssumeCapacity(.{ .Object = index });
+    const object = vm.objects.items[index];
+    vm.stack.appendAssumeCapacity(.{ .Object = object });
 }
 
 fn interpretAdd(vm: *VirtualMachine) !void {

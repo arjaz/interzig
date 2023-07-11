@@ -186,8 +186,9 @@ test "interpret set global" {
     const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
-    const globalNameIndex = try vm.addObject(try vm.string_from_u8_slice("nice"));
-    const globalConstantIndex = try vm.addConstant(.{ .Object = globalNameIndex });
+    const fnName = try vm.string_from_u8_slice("nice");
+    _ = try vm.addObject(fnName);
+    const globalConstantIndex = try vm.addConstant(.{ .Object = fnName });
     _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = globalConstantIndex }, 0);
     _ = try chunk.addInstruction(.Return, 0);
@@ -208,8 +209,9 @@ test "interpret read global" {
     const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
-    const globalNameIndex = try vm.addObject(try vm.string_from_u8_slice("nice"));
-    const globalConstantIndex = try vm.addConstant(.{ .Object = globalNameIndex });
+    const fnName = try vm.string_from_u8_slice("nice");
+    _ = try vm.addObject(fnName);
+    const globalConstantIndex = try vm.addConstant(.{ .Object = fnName });
     _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = globalConstantIndex }, 0);
     _ = try chunk.addInstruction(.Pop, 0);
