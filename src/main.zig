@@ -11,10 +11,10 @@ pub fn main() !void {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
 
     const strIndex = try vm.addObject(try vm.string_from_u8_slice("I love Helga\n"));
-    const nativePrintStringIndex = try vm.addObject(.{ .Native = .{ .arity = 1, .function = nativePrintString } });
+    const nativePrintStringIndex = try vm.addObject(try vm.native_function(1, nativePrintString));
 
     _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = strIndex }, 0);
     _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = nativePrintStringIndex }, 0);
@@ -50,7 +50,7 @@ pub const VirtualMachine = struct {
     // They're global as to allow reusing the same upvalues for different closures.
     // Closing an upvalues means moving it and all preceding upvalues to the heap.
     upvalues: std.SinglyLinkedList(*Object),
-    objects: std.ArrayList(Object),
+    objects: std.ArrayList(*Object),
     globals: std.StringHashMap(Value),
 
     pub fn init(allocator: std.mem.Allocator) !VirtualMachine {
@@ -61,7 +61,7 @@ pub const VirtualMachine = struct {
             .stack = stack,
             .constants = std.ArrayList(Value).init(allocator),
             .upvalues = std.SinglyLinkedList(*Object){},
-            .objects = std.ArrayList(Object).init(allocator),
+            .objects = std.ArrayList(*Object).init(allocator),
             .globals = std.StringHashMap(Value).init(allocator),
         };
     }
@@ -70,8 +70,9 @@ pub const VirtualMachine = struct {
         self.frames.deinit();
         self.stack.deinit();
         self.constants.deinit();
-        for (self.objects.items) |*object| {
+        for (self.objects.items) |object| {
             object.deinit(self.allocator);
+            self.allocator.destroy(object);
         }
         self.objects.deinit();
         self.globals.deinit();
@@ -100,7 +101,7 @@ pub const VirtualMachine = struct {
     pub fn printObjects(self: *VirtualMachine) void {
         std.debug.print("=== Objects ===\n", .{});
         for (self.objects.items) |object, offset| {
-            switch (object) {
+            switch (object.*) {
                 .String => |s| {
                     std.debug.print("{x:4}    \"{s}\"\n", .{ offset, s.items });
                 },
@@ -139,7 +140,7 @@ pub const VirtualMachine = struct {
         return self.constants.items.len - 1;
     }
 
-    pub fn addObject(self: *VirtualMachine, object: Object) !usize {
+    pub fn addObject(self: *VirtualMachine, object: *Object) !usize {
         try self.objects.append(object);
         return self.objects.items.len - 1;
     }
@@ -192,7 +193,7 @@ pub const VirtualMachine = struct {
                 .Call => {
                     const fIndex = self.stack.pop();
                     const fObject = switch (fIndex) {
-                        .Object => |index| &self.objects.items[index],
+                        .Object => |index| self.objects.items[index],
                         else => {
                             std.debug.print("Expected object on the stack, found: ", .{});
                             fIndex.print();
@@ -305,20 +306,36 @@ pub const VirtualMachine = struct {
         }
     }
 
-    pub fn string_from_u8_slice(self: *VirtualMachine, slice: []const u8) !Object {
+    pub fn string_from_u8_slice(self: *VirtualMachine, slice: []const u8) !*Object {
         var string = std.ArrayList(u8).init(self.allocator);
         for (slice) |byte| {
             try string.append(byte);
         }
-        return .{ .String = string };
+        var memory = try self.allocator.create(Object);
+        memory.* = .{ .String = string };
+        return memory;
     }
 
-    pub fn named_function(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !Object {
+    pub fn named_function(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !*Object {
         var nameF = std.ArrayList(u8).init(self.allocator);
         for (name) |byte| {
             try nameF.append(byte);
         }
-        return .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } };
+        var memory = try self.allocator.create(Object);
+        memory.* = .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } };
+        return memory;
+    }
+
+    pub fn native_function(self: *VirtualMachine, arity: u8, function: *const fn (*VirtualMachine, usize) Value) !*Object {
+        var memory = try self.allocator.create(Object);
+        memory.* = .{ .Native = .{ .arity = arity, .function = function } };
+        return memory;
+    }
+
+    pub fn closure(self: *VirtualMachine, function: *Object, upvalues: std.ArrayList(*Object)) !*Object {
+        var memory = try self.allocator.create(Object);
+        memory.* = .{ .Closure = .{ .function = function, .upvalues = upvalues } };
+        return memory;
     }
 };
 
@@ -574,7 +591,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
     //       we should probably move the functions to the constant pool
     const fIndex = vm.stack.pop();
     const fObject = switch (fIndex) {
-        .Object => |index| &vm.objects.items[index],
+        .Object => |index| vm.objects.items[index],
         else => {
             std.debug.print("Expected object on the stack\n", .{});
             return error.TypeMismatch;
@@ -598,7 +615,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
                     },
                 }
             }
-            const cIndex = try vm.addObject(.{ .Closure = .{ .function = fObject, .upvalues = upvalues } });
+            const cIndex = try vm.addObject(try vm.closure(fObject, upvalues));
             _ = vm.stack.appendAssumeCapacity(.{ .Object = cIndex });
         },
         else => {
@@ -729,7 +746,7 @@ fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
             return error.InvalidGlobalNameIndex;
         },
     };
-    const name = switch (nameObject) {
+    const name = switch (nameObject.*) {
         .String => nameObject.String,
         else => {
             std.debug.print("Invalid global name\n", .{});
@@ -748,7 +765,7 @@ fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
             return error.InvalidGlobalNameIndex;
         },
     };
-    const name = switch (nameObject) {
+    const name = switch (nameObject.*) {
         .String => nameObject.String,
         else => {
             std.debug.print("Invalid global name\n", .{});

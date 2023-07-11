@@ -24,7 +24,7 @@ test "interpret return" {
     const nil = try vm.addConstant(.Nil);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     _ = try chunk.addInstruction(.{ .LoadConstant = nil }, 0);
     _ = try chunk.addInstruction(.Return, 0);
@@ -41,7 +41,7 @@ test "interpret constant" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.{ .I64 = 42 });
     _ = try chunk.addInstruction(.{ .LoadConstant = index }, 0);
@@ -59,7 +59,7 @@ test "interpret 1 + 2" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
     const index2 = try vm.addConstant(.{ .I64 = 2 });
@@ -80,7 +80,7 @@ test "interpret 1 - 2" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
     const index2 = try vm.addConstant(.{ .I64 = 2 });
@@ -101,7 +101,7 @@ test "interpret 10u64 - 7u64" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .U64 = 10 });
     const index2 = try vm.addConstant(.{ .U64 = 7 });
@@ -122,7 +122,7 @@ test "interpret not(nil)" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.Nil);
     _ = try chunk.addInstruction(.{ .LoadConstant = index }, 0);
@@ -141,7 +141,7 @@ test "interpret not(10.7)" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index = try vm.addConstant(.{ .F64 = 10.7 });
     _ = try chunk.addInstruction(.{ .LoadConstant = index }, 0);
@@ -160,7 +160,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const index1 = try vm.addConstant(.{ .I64 = 1 });
     const index2 = try vm.addConstant(.{ .F64 = 2.5 });
@@ -183,7 +183,7 @@ test "interpret set global" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     const globalNameIndex = try vm.addObject(try vm.string_from_u8_slice("nice"));
@@ -205,7 +205,7 @@ test "interpret read global" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     const globalNameIndex = try vm.addObject(try vm.string_from_u8_slice("nice"));
@@ -228,7 +228,7 @@ test "interpret jump over one instruction" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     _ = try chunk.addInstruction(.{ .Jump = 2 }, 0);
@@ -247,7 +247,7 @@ test "interpret jump if false with nil on the stack" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexNil = try vm.addConstant(.Nil);
     _ = try chunk.addInstruction(.{ .LoadConstant = indexNil }, 0);
@@ -266,7 +266,7 @@ test "interpret jump if false with true on the stack" {
     defer vm.deinit();
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
@@ -286,7 +286,7 @@ test "interpret jump back" {
 
     const nilIndex = try vm.addConstant(.Nil);
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const chunk = &mainFn.Function.chunk;
     _ = try chunk.addInstruction(.{ .Jump = 3 }, 0);
     _ = try chunk.addInstruction(.{ .LoadConstant = nilIndex }, 0);
@@ -309,13 +309,13 @@ test "interpret fn call" {
     const indexTrue = try vm.addConstant(.True);
 
     const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 0));
-    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueFn = vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
     _ = try mainChunk.addInstruction(.Call, 0);
@@ -337,13 +337,13 @@ test "interpret closure call" {
     const indexTrue = try vm.addConstant(.True);
 
     const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 0));
-    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueFn = vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
     _ = try mainChunk.addInstruction(.AsClosure, 0);
@@ -385,13 +385,13 @@ test "interpret closure call with an open local upmain.Value" {
     const indexTrue = try vm.addConstant(.True);
 
     const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 1));
-    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueFn = vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
@@ -444,13 +444,13 @@ test "interpret closure call with an open non-local upvalue" {
     const indexTrue = try vm.addConstant(.True);
 
     const justTrue2FnIndex = try vm.addObject(try vm.named_function("justTrue2", 0, 1));
-    const justTrue2Fn = &vm.objects.items[justTrue2FnIndex];
+    const justTrue2Fn = vm.objects.items[justTrue2FnIndex];
     const justTrue2Chunk = &justTrue2Fn.Function.chunk;
     _ = try justTrue2Chunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
     _ = try justTrue2Chunk.addInstruction(.Return, 0);
 
     const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 1));
-    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueFn = vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadObject = justTrue2FnIndex }, 0);
     _ = try justTrueChunk.addInstruction(.AsClosure, 0);
@@ -459,7 +459,7 @@ test "interpret closure call with an open non-local upvalue" {
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
@@ -510,13 +510,13 @@ test "interpret closure call with a closed upvalue" {
     const indexTrue = try vm.addConstant(.True);
 
     const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 1));
-    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueFn = vm.objects.items[justTrueFnIndex];
     const justTrueChunk = &justTrueFn.Function.chunk;
     _ = try justTrueChunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
     _ = try justTrueChunk.addInstruction(.Return, 0);
 
     const justTrue2FnIndex = try vm.addObject(try vm.named_function("justTrueFn", 0, 0));
-    const justTrue2Fn = &vm.objects.items[justTrue2FnIndex];
+    const justTrue2Fn = vm.objects.items[justTrue2FnIndex];
     const justTrue2Chunk = &justTrue2Fn.Function.chunk;
     _ = try justTrue2Chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try justTrue2Chunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
@@ -525,7 +525,7 @@ test "interpret closure call with a closed upvalue" {
     _ = try justTrue2Chunk.addInstruction(.Return, 0);
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadObject = justTrue2FnIndex }, 0);
     _ = try mainChunk.addInstruction(.Call, 0);
@@ -546,7 +546,7 @@ test "interpret calling 1" {
     const oneIndex = try vm.addConstant(.{ .U64 = 1 });
 
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
     _ = try mainChunk.addInstruction(.Call, 0);
@@ -575,14 +575,15 @@ test "interpret native fn call" {
     defer vm.deinit();
     const oneIndex = try vm.addConstant(.{ .U64 = 1 });
 
-    var nativeFn = .{ .Native = .{
+    var nativeFn = try std.testing.allocator.create(main.Object);
+    nativeFn.* = .{ .Native = .{
         .arity = 1,
         .function = &nativeFnTest,
     } };
 
     const nativeFnIndex = try vm.addObject(nativeFn);
     const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainFn = vm.objects.items[mainFnIndex];
     const mainChunk = &mainFn.Function.chunk;
     _ = try mainChunk.addInstruction(.{ .LoadConstant = oneIndex }, 0);
     _ = try mainChunk.addInstruction(.{ .LoadObject = nativeFnIndex }, 0);
