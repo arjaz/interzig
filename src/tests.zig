@@ -476,6 +476,69 @@ test "interpret closure call with an open non-local upvalue" {
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
+test "interpret closure call with a closed upvalue" {
+    // fn justTrueFn() {
+    //     let a = true;
+    //     fn justTrue() {
+    //         return a;
+    //     }
+    //     return justTrue2Fn;
+    // }
+    //
+    // fn main() {
+    //     let justTrueFn = justTrueFn();
+    //     return justTrueFn();
+    // }
+    //
+    // justTrue:
+    //   load upvalue 0
+    //   return
+    // justTrueFn:
+    //   load true
+    //   load justTrue
+    //   as closure
+    //   capture local 0
+    //   return
+    // main:
+    //   load justTrueFn
+    //   call
+    //   call
+    //   return
+    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    defer vm.deinit();
+
+    const indexTrue = try vm.addConstant(.True);
+
+    const justTrueFnIndex = try vm.addObject(try vm.named_function("justTrue", 0, 1));
+    const justTrueFn = &vm.objects.items[justTrueFnIndex];
+    const justTrueChunk = &justTrueFn.Function.chunk;
+    _ = try justTrueChunk.addInstruction(.{ .LoadUpvalue = 0 }, 0);
+    _ = try justTrueChunk.addInstruction(.Return, 0);
+
+    const justTrue2FnIndex = try vm.addObject(try vm.named_function("justTrueFn", 0, 0));
+    const justTrue2Fn = &vm.objects.items[justTrue2FnIndex];
+    const justTrue2Chunk = &justTrue2Fn.Function.chunk;
+    _ = try justTrue2Chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
+    _ = try justTrue2Chunk.addInstruction(.{ .LoadObject = justTrueFnIndex }, 0);
+    _ = try justTrue2Chunk.addInstruction(.AsClosure, 0);
+    _ = try justTrue2Chunk.addInstruction(.{ .CaptureUpvalue = .{ .local = true, .index = 0 } }, 0);
+    _ = try justTrue2Chunk.addInstruction(.Return, 0);
+
+    const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
+    const mainFn = &vm.objects.items[mainFnIndex];
+    const mainChunk = &mainFn.Function.chunk;
+    _ = try mainChunk.addInstruction(.{ .LoadObject = justTrue2FnIndex }, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Call, 0);
+    _ = try mainChunk.addInstruction(.Return, 0);
+
+    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &mainChunk.code.items[0]), .function = mainFn, .stackBase = 0 };
+    try vm.frames.append(frame);
+    const result = try vm.interpret();
+    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
 test "interpret calling 1" {
     var vm = try main.VirtualMachine.init(std.testing.allocator);
     defer vm.deinit();

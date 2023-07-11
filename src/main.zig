@@ -24,6 +24,10 @@ pub fn main() !void {
     const mainFrame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainFn.Function.chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
     try vm.frames.append(mainFrame);
     _ = try vm.interpret();
+
+    vm.printStack();
+    vm.printObjects();
+    vm.printTrace();
 }
 
 fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
@@ -71,6 +75,12 @@ pub const VirtualMachine = struct {
         }
         self.objects.deinit();
         self.globals.deinit();
+
+        var it = self.upvalues.first;
+        while (it) |node| {
+            it = node.next;
+            self.allocator.destroy(node);
+        }
     }
 
     pub fn printStack(self: *VirtualMachine) void {
@@ -103,6 +113,10 @@ pub const VirtualMachine = struct {
                 .Closure => |c| {
                     std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.Function.arity, c.function.Function.name.items });
                 },
+                .Upvalue => |u| {
+                    _ = u;
+                    std.debug.print("{x:4}    upvalue\n", .{offset});
+                },
             }
         }
     }
@@ -111,9 +125,10 @@ pub const VirtualMachine = struct {
         std.debug.print("=== Trace ===\n", .{});
         for (self.frames.items) |frame, offset| {
             // The function can point to either a Function or a Closure.
-            const function = switch (frame.function) {
+            const function = switch (frame.function.*) {
                 .Function => frame.function.Function,
                 .Closure => frame.function.Closure.function.Function,
+                else => unreachable,
             };
             std.debug.print("{x:4}    {s}\n", .{ offset, function.name.items });
         }
@@ -139,6 +154,12 @@ pub const VirtualMachine = struct {
             switch (instruction) {
                 .Return => {
                     const result = self.stack.pop();
+                    // we close all open upvalues here
+                    // but we can possibly have no elements on the stack of the frame
+                    // so we need to check for that
+                    if (self.stack.items.len > frame.stackBase) {
+                        self.closeUpvalues(&self.stack.items[frame.stackBase]);
+                    }
                     _ = self.frames.pop();
                     if (self.frames.items.len == 0) {
                         return result;
@@ -151,52 +172,7 @@ pub const VirtualMachine = struct {
                     _ = self.stack.pop();
                 },
                 .AsClosure => {
-                    const fIndex = self.stack.pop();
-                    const fObject = switch (fIndex) {
-                        .Object => |index| &self.objects.items[index],
-                        else => {
-                            std.debug.print("Expected object on the stack\n", .{});
-                            return error.TypeMismatch;
-                        },
-                    };
-
-                    switch (fObject.*) {
-                        .Function => {
-                            var lenUpvalues = fObject.Function.upvalues;
-                            var upvalues = std.ArrayList(*Object).init(self.allocator);
-                            while (lenUpvalues > 0) {
-                                frame.ip += 1;
-                                lenUpvalues -= 1;
-                                switch (frame.ip[0]) {
-                                    .CaptureUpvalue => |u| {
-                                        // TODO: check and modify the open upvalues list
-                                        if (u.local) {
-                                            const value = &self.stack.items[frame.stackBase + u.index];
-                                            const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
-                                            const memory = try self.allocator.create(Object);
-                                            memory.* = upvalue;
-                                            _ = try upvalues.append(memory);
-                                        } else {
-                                            const upvalue = frame.function.Closure.upvalues.items[u.index].*;
-                                            const memory = try self.allocator.create(Object);
-                                            memory.* = upvalue;
-                                            _ = try upvalues.append(memory);
-                                        }
-                                    },
-                                    else => {
-                                        std.debug.print("Expected CaptureUpvalue instruction\n", .{});
-                                        return error.InternalError;
-                                    },
-                                }
-                            }
-                            const cIndex = try self.addObject(.{ .Closure = .{ .function = fObject, .upvalues = upvalues } });
-                            _ = self.stack.appendAssumeCapacity(.{ .Object = cIndex });
-                        },
-                        else => {
-                            std.debug.print("Expected function on the stack\n", .{});
-                            return error.TypeMismatch;
-                        },
-                    }
+                    try interpretAsClosure(self, frame);
                 },
                 .CaptureUpvalue => {
                     // this is disallowed, the upvalue capture is done in .AsClosure
@@ -207,24 +183,19 @@ pub const VirtualMachine = struct {
                     // all upvalues that point to the stack index or above should be closed
                     // to do that we iterate over the open upvalues linked list and close them one by one
                     // all while removing them from the linked list
+                    // note that the non-discarded upvalues are closed automatically when the function returns
+                    // so that instruction just provides more control over the lifetime of the upvalue
                     const stackPointer = &self.stack.items[self.stack.items.len - offset - 1];
-                    var it = self.upvalues.first;
-                    while (it) |node| : (it = node.next) {
-                        var upvalue = node.data;
-                        if (@ptrToInt(upvalue.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
-                            upvalue.* = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.Upvalue.Open.location.* } } };
-                            self.upvalues.remove(node);
-                        } else {
-                            break;
-                        }
-                    }
+                    self.closeUpvalues(stackPointer);
+                    _ = self.stack.pop();
                 },
                 .Call => {
                     const fIndex = self.stack.pop();
                     const fObject = switch (fIndex) {
                         .Object => |index| &self.objects.items[index],
                         else => {
-                            std.debug.print("Expected object on the stack\n", .{});
+                            std.debug.print("Expected object on the stack, found: ", .{});
+                            fIndex.print();
                             return error.TypeMismatch;
                         },
                     };
@@ -315,6 +286,21 @@ pub const VirtualMachine = struct {
                 .NotEqual => {
                     try interpretNotEqual(self);
                 },
+            }
+        }
+    }
+
+    fn closeUpvalues(self: *VirtualMachine, stackPointer: *Value) void {
+        var it = self.upvalues.first;
+        while (it) |node| {
+            it = node.next;
+            var upvalue = node.data;
+            if (@ptrToInt(upvalue.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
+                upvalue.* = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.Upvalue.Open.location.* } } };
+                self.upvalues.remove(node);
+                self.allocator.destroy(node);
+            } else {
+                break;
             }
         }
     }
@@ -508,6 +494,21 @@ pub const Chunk = struct {
                 .Call => {
                     std.debug.print("{x:4}    {d} call\n", .{ offset, line });
                 },
+                .AsClosure => {
+                    std.debug.print("{x:4}    {d} as closure\n", .{ offset, line });
+                },
+                .CloseUpvalue => {
+                    std.debug.print("{x:4}    {d} close upvalue {d}\n", .{ offset, line, instruction.CloseUpvalue });
+                },
+                .CaptureUpvalue => {
+                    std.debug.print("{x:4}    {d} capture upvalue {d}\n", .{ offset, line, instruction.CaptureUpvalue.index });
+                },
+                .StoreUpvalue => {
+                    std.debug.print("{x:4}    {d} store upvalue {d}\n", .{ offset, line, instruction.StoreUpvalue });
+                },
+                .LoadUpvalue => {
+                    std.debug.print("{x:4}    {d} load upvalue {d}\n", .{ offset, line, instruction.LoadUpvalue });
+                },
                 .StoreGlobal => {
                     std.debug.print("{x:4}    {d} store global {d}\n", .{ offset, line, instruction.StoreGlobal });
                 },
@@ -566,6 +567,84 @@ pub const Chunk = struct {
         return self.code.items.len - 1;
     }
 };
+
+fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
+    // TODO: can we pop here safely?
+    //       what if the GC kicks in and frees the object?
+    //       we should probably move the functions to the constant pool
+    const fIndex = vm.stack.pop();
+    const fObject = switch (fIndex) {
+        .Object => |index| &vm.objects.items[index],
+        else => {
+            std.debug.print("Expected object on the stack\n", .{});
+            return error.TypeMismatch;
+        },
+    };
+
+    switch (fObject.*) {
+        .Function => {
+            var lenUpvalues = fObject.Function.upvalues;
+            var upvalues = std.ArrayList(*Object).init(vm.allocator);
+            while (lenUpvalues > 0) {
+                frame.ip += 1;
+                lenUpvalues -= 1;
+                switch (frame.ip[0]) {
+                    .CaptureUpvalue => {
+                        try captureUpvalue(vm, frame, &upvalues, frame.ip[0]);
+                    },
+                    else => {
+                        std.debug.print("Expected CaptureUpvalue instruction\n", .{});
+                        return error.InternalError;
+                    },
+                }
+            }
+            const cIndex = try vm.addObject(.{ .Closure = .{ .function = fObject, .upvalues = upvalues } });
+            _ = vm.stack.appendAssumeCapacity(.{ .Object = cIndex });
+        },
+        else => {
+            std.debug.print("Expected function on the stack\n", .{});
+            return error.TypeMismatch;
+        },
+    }
+}
+
+fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayList(*Object), opcode: OpCode) !void {
+    const u = opcode.CaptureUpvalue;
+    if (u.local) {
+        var previous: ?*std.SinglyLinkedList(*Object).Node = null;
+        var current = vm.upvalues.first;
+
+        while (current != null and @ptrToInt(current.?.data.Upvalue.Open.location) > @ptrToInt(&vm.stack.items[frame.stackBase + u.index])) {
+            previous = current;
+            current = current.?.next;
+        }
+
+        if (current != null and current.?.data.Upvalue.Open.location == &vm.stack.items[frame.stackBase + u.index]) {
+            try upvalues.append(current.?.data);
+            // frame.function.Closure.upvalues.items[u.index] = current.?.data;
+        } else {
+            const memory = try vm.allocator.create(Object);
+            const value = &vm.stack.items[frame.stackBase + u.index];
+            const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
+            memory.* = upvalue;
+            try upvalues.append(memory);
+            // frame.function.Closure.upvalues.items[u.index] = memory;
+
+            var node = try vm.allocator.create(std.SinglyLinkedList(*Object).Node);
+            node.data = memory;
+            if (previous == null) {
+                vm.upvalues.prepend(node);
+            } else {
+                previous.?.insertAfter(node);
+            }
+        }
+    } else {
+        var memory = try vm.allocator.create(Object);
+        const upvalue = frame.function.Closure.upvalues.items[u.index];
+        memory.* = upvalue.*;
+        try upvalues.append(memory);
+    }
+}
 
 fn interpretJumpIfFalse(vm: *VirtualMachine, frame: *CallFrame, offset: u32) !void {
     const value = vm.stack.items[vm.stack.items.len - 1];
