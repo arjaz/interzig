@@ -29,6 +29,7 @@ pub fn main() !void {
 
     vm.printStack();
     vm.printObjects();
+    vm.printConstants();
     vm.printTrace();
 }
 
@@ -109,27 +110,17 @@ pub const VirtualMachine = struct {
         }
     }
 
+    pub fn printConstants(self: *VirtualMachine) void {
+        std.debug.print("=== Constants ===\n", .{});
+        for (self.constants.items) |constant, offset| {
+            constant.print(offset);
+        }
+    }
+
     pub fn printObjects(self: *VirtualMachine) void {
         std.debug.print("=== Objects ===\n", .{});
         for (self.objects.items) |object, offset| {
-            switch (object.*) {
-                .String => |s| {
-                    std.debug.print("{x:4}    \"{s}\"\n", .{ offset, s.items });
-                },
-                .Function => |f| {
-                    std.debug.print("{x:4}    function/{} \"{s}\"\n", .{ offset, f.arity, f.name.items });
-                },
-                .Native => |n| {
-                    std.debug.print("{x:4}    native/{}\n", .{ offset, n.arity });
-                },
-                .Closure => |c| {
-                    std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.Function.arity, c.function.Function.name.items });
-                },
-                .Upvalue => |u| {
-                    _ = u;
-                    std.debug.print("{x:4}    upvalue\n", .{offset});
-                },
-            }
+            object.print(offset);
         }
     }
 
@@ -206,8 +197,7 @@ pub const VirtualMachine = struct {
                     const fObject = switch (fIndex) {
                         .Object => |o| o,
                         else => {
-                            std.debug.print("Expected object on the stack, found: ", .{});
-                            fIndex.print();
+                            std.debug.print("Expected object on the stack, found: {}\n", .{fIndex});
                             return error.TypeMismatch;
                         },
                     };
@@ -393,6 +383,27 @@ pub const Object = union(enum) {
             .Upvalue => {},
         }
     }
+
+    pub fn print(self: *Object, offset: usize) void {
+        switch (self.*) {
+            .String => |s| {
+                std.debug.print("{x:4}    \"{s}\"\n", .{ offset, s.items });
+            },
+            .Function => |f| {
+                std.debug.print("{x:4}    function/{} \"{s}\"\n", .{ offset, f.arity, f.name.items });
+            },
+            .Native => |n| {
+                std.debug.print("{x:4}    native/{}\n", .{ offset, n.arity });
+            },
+            .Closure => |c| {
+                std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.Function.arity, c.function.Function.name.items });
+            },
+            .Upvalue => |u| {
+                _ = u;
+                std.debug.print("{x:4}    upvalue\n", .{offset});
+            },
+        }
+    }
 };
 
 /// A call frame can refer to a function or a closure.
@@ -411,7 +422,7 @@ pub const Value = union(enum) {
     Nil,
     Object: *Object,
 
-    pub fn print(self: Value) void {
+    pub fn print(self: Value, offset: usize) void {
         switch (self) {
             .I64 => |im| {
                 std.debug.print("{} i64\n", .{im});
@@ -428,8 +439,8 @@ pub const Value = union(enum) {
             .True => {
                 std.debug.print("true\n", .{});
             },
-            .Object => |index| {
-                std.debug.print("object {}\n", .{index});
+            .Object => |o| {
+                o.print(offset);
             },
         }
     }
