@@ -10,14 +10,16 @@ pub fn main() !void {
     var vm = try VirtualMachine.init(allocator);
     defer vm.deinit();
 
-    const mainFnIndex = try vm.addObject(try vm.named_function("main", 0, 0));
-    const mainFn = vm.objects.items[mainFnIndex];
+    const mainFn = try vm.named_function("main", 0, 0);
+    _ = try vm.addConstant(.{ .Object = mainFn });
 
-    const strIndex = try vm.addObject(try vm.string_from_u8_slice("I love Helga\n"));
-    const nativePrintStringIndex = try vm.addObject(try vm.native_function(1, nativePrintString));
+    const outString = try vm.string_from_u8_slice("I love Helga\n");
+    const strIndex = try vm.addConstant(.{ .Object = outString });
+    const nativePrint = try vm.native_function(1, nativePrintString);
+    const nativePrintStringIndex = try vm.addConstant(.{ .Object = nativePrint });
 
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = strIndex }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadObject = nativePrintStringIndex }, 0);
+    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = strIndex }, 0);
+    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = nativePrintStringIndex }, 0);
     _ = try mainFn.Function.chunk.addInstruction(.Call, 0);
     _ = try mainFn.Function.chunk.addInstruction(.Return, 0);
 
@@ -69,6 +71,15 @@ pub const VirtualMachine = struct {
     pub fn deinit(self: *VirtualMachine) void {
         self.frames.deinit();
         self.stack.deinit();
+        for (self.constants.items) |v| {
+            switch (v) {
+                .Object => |object| {
+                    object.deinit(self.allocator);
+                    self.allocator.destroy(object);
+                },
+                else => {},
+            }
+        }
         self.constants.deinit();
         for (self.objects.items) |object| {
             object.deinit(self.allocator);
@@ -341,8 +352,16 @@ pub const VirtualMachine = struct {
 
 pub const Object = union(enum) {
     String: std.ArrayList(u8),
-    Function: struct { arity: u8, upvalues: usize, chunk: Chunk, name: std.ArrayList(u8) },
-    Native: struct { arity: u8, function: *const fn (*VirtualMachine, usize) Value },
+    Function: struct {
+        arity: u8,
+        upvalues: usize,
+        chunk: Chunk,
+        name: std.ArrayList(u8),
+    },
+    Native: struct {
+        arity: u8,
+        function: *const fn (*VirtualMachine, usize) Value,
+    },
     Closure: struct {
         function: *const Object,
         upvalues: std.ArrayList(*Object),

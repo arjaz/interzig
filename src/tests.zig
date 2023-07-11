@@ -187,7 +187,6 @@ test "interpret set global" {
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     const fnName = try vm.string_from_u8_slice("nice");
-    _ = try vm.addObject(fnName);
     const globalConstantIndex = try vm.addConstant(.{ .Object = fnName });
     _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = globalConstantIndex }, 0);
@@ -210,7 +209,6 @@ test "interpret read global" {
     const chunk = &mainFn.Function.chunk;
     const indexTrue = try vm.addConstant(.True);
     const fnName = try vm.string_from_u8_slice("nice");
-    _ = try vm.addObject(fnName);
     const globalConstantIndex = try vm.addConstant(.{ .Object = fnName });
     _ = try chunk.addInstruction(.{ .LoadConstant = indexTrue }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = globalConstantIndex }, 0);
