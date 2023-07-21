@@ -50,8 +50,8 @@ pub const VirtualMachine = struct {
     constants: std.ArrayList(Value),
     // Open upvalues are stored in a separate linked list.
     // They're sorted by stack slot index, the further you go, the deeper you look into the stack.
-    // They're global as to allow reusing the same upvalues for different closures.
-    // Closing an upvalues means moving it and all preceding upvalues to the heap.
+    // They're global but the upvalues are closed when returning from a function.
+    // Closing an upvalue means moving it and all preceding upvalues to the heap.
     upvalues: std.SinglyLinkedList(*Object),
     // That array list is here just to track the allocated memory
     objects: std.ArrayList(*Object),
