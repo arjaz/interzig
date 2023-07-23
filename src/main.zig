@@ -10,21 +10,21 @@ pub fn main() !void {
     var vm = try VirtualMachine.init(allocator);
     defer vm.deinit();
 
-    const mainFn = try vm.named_function("main", 0, 0);
-    _ = try vm.addConstant(.{ .Object = mainFn });
+    const main_fn = try vm.namedFunction("main", 0, 0);
+    _ = try vm.addConstant(.{ .Object = main_fn });
 
-    const outString = try vm.string_from_u8_slice("I love Helga\n");
-    const strIndex = try vm.addConstant(.{ .Object = outString });
-    const nativePrint = try vm.native_function(1, nativePrintString);
-    const nativePrintStringIndex = try vm.addConstant(.{ .Object = nativePrint });
+    const out_string = try vm.stringFromU8Slice("I love Helga\n");
+    const str_index = try vm.addConstant(.{ .Object = out_string });
+    const native_print = try vm.nativeFunction(1, nativePrintString);
+    const native_print_string_index = try vm.addConstant(.{ .Object = native_print });
 
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = strIndex }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.{ .LoadConstant = nativePrintStringIndex }, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.Call, 0);
-    _ = try mainFn.Function.chunk.addInstruction(.Return, 0);
+    _ = try main_fn.data.Function.chunk.addInstruction(.{ .LoadConstant = str_index }, 0);
+    _ = try main_fn.data.Function.chunk.addInstruction(.{ .LoadConstant = native_print_string_index }, 0);
+    _ = try main_fn.data.Function.chunk.addInstruction(.Call, 0);
+    _ = try main_fn.data.Function.chunk.addInstruction(.Return, 0);
 
-    const mainFrame = CallFrame{ .ip = @ptrCast([*]OpCode, &mainFn.Function.chunk.code.items[0]), .function = mainFn, .stackBase = 0 };
-    try vm.frames.append(mainFrame);
+    const main_frame = CallFrame{ .ip = @ptrCast([*]OpCode, &main_fn.data.Function.chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    try vm.frames.append(main_frame);
     _ = try vm.interpret();
 
     vm.printStack();
@@ -37,8 +37,8 @@ fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
     if (arity != 1) {
         unreachable;
     }
-    const stringIndex = vm.stack.pop();
-    const string = stringIndex.Object.String;
+    const string_index = vm.stack.pop();
+    const string = string_index.Object.data.String;
     std.debug.print("{s}", .{string.items});
     return Value.Nil;
 }
@@ -129,9 +129,9 @@ pub const VirtualMachine = struct {
         std.debug.print("=== Trace ===\n", .{});
         for (self.frames.items) |frame, offset| {
             // The function can point to either a Function or a Closure.
-            const function = switch (frame.function.*) {
-                .Function => frame.function.Function,
-                .Closure => frame.function.Closure.function.Function,
+            const function = switch (frame.function.data) {
+                .Function => frame.function.data.Function,
+                .Closure => frame.function.data.Closure.function.data.Function,
                 else => unreachable,
             };
             std.debug.print("{x:4}    {s}\n", .{ offset, function.name.items });
@@ -161,14 +161,14 @@ pub const VirtualMachine = struct {
                     // we close all open upvalues here
                     // but we can possibly have no elements on the stack of the frame
                     // so we need to check for that
-                    if (self.stack.items.len > frame.stackBase) {
-                        self.closeUpvalues(&self.stack.items[frame.stackBase]);
+                    if (self.stack.items.len > frame.stack_base) {
+                        self.closeUpvalues(&self.stack.items[frame.stack_base]);
                     }
                     _ = self.frames.pop();
                     if (self.frames.items.len == 0) {
                         return result;
                     }
-                    self.stack.shrinkRetainingCapacity(frame.stackBase);
+                    self.stack.shrinkRetainingCapacity(frame.stack_base);
                     frame = &self.frames.items[self.frames.items.len - 1];
                     _ = self.stack.appendAssumeCapacity(result);
                 },
@@ -189,38 +189,38 @@ pub const VirtualMachine = struct {
                     // all while removing them from the linked list
                     // note that the non-discarded upvalues are closed automatically when the function returns
                     // so that instruction just provides more control over the lifetime of the upvalue
-                    const stackPointer = &self.stack.items[self.stack.items.len - offset - 1];
-                    self.closeUpvalues(stackPointer);
+                    const stack_pointer = &self.stack.items[self.stack.items.len - offset - 1];
+                    self.closeUpvalues(stack_pointer);
                     _ = self.stack.pop();
                 },
                 .Call => {
-                    const fIndex = self.stack.pop();
-                    const fObject = switch (fIndex) {
+                    const index = self.stack.pop();
+                    const object = switch (index) {
                         .Object => |o| o,
                         else => {
-                            std.debug.print("Expected object on the stack, found: {}\n", .{fIndex});
+                            std.debug.print("Expected object on the stack, found: {}\n", .{index});
                             return error.TypeMismatch;
                         },
                     };
-                    switch (fObject.*) {
+                    switch (object.data) {
                         .Function => |f| {
-                            const newFrame = CallFrame{
+                            const new_frame = CallFrame{
                                 .ip = @ptrCast([*]OpCode, &f.chunk.code.items[0]),
-                                .function = fObject,
-                                .stackBase = self.stack.items.len - f.arity,
+                                .function = object,
+                                .stack_base = self.stack.items.len - f.arity,
                             };
-                            try self.frames.append(newFrame);
+                            try self.frames.append(new_frame);
                             frame = &self.frames.items[self.frames.items.len - 1];
                             // Subtract 1 because the loop will increment the instruction pointer.
                             frame.ip -= 1;
                         },
                         .Closure => |c| {
-                            const newFrame = CallFrame{
-                                .ip = @ptrCast([*]OpCode, &c.function.Function.chunk.code.items[0]),
-                                .function = fObject,
-                                .stackBase = self.stack.items.len - c.function.Function.arity,
+                            const new_frame = CallFrame{
+                                .ip = @ptrCast([*]OpCode, &c.function.data.Function.chunk.code.items[0]),
+                                .function = object,
+                                .stack_base = self.stack.items.len - c.function.data.Function.arity,
                             };
-                            try self.frames.append(newFrame);
+                            try self.frames.append(new_frame);
                             frame = &self.frames.items[self.frames.items.len - 1];
                             // Subtract 1 because the loop will increment the instruction pointer.
                             frame.ip -= 1;
@@ -298,8 +298,11 @@ pub const VirtualMachine = struct {
         while (it) |node| {
             it = node.next;
             var upvalue = node.data;
-            if (@ptrToInt(upvalue.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
-                upvalue.* = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.Upvalue.Open.location.* } } };
+            if (@ptrToInt(upvalue.data.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
+                upvalue.* = .{
+                    .marked = false,
+                    .data = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.data.Upvalue.Open.location.* } } },
+                };
                 self.upvalues.remove(node);
                 self.allocator.destroy(node);
             } else {
@@ -308,85 +311,96 @@ pub const VirtualMachine = struct {
         }
     }
 
-    pub fn string_from_u8_slice(self: *VirtualMachine, slice: []const u8) !*Object {
+    pub fn stringFromU8Slice(self: *VirtualMachine, slice: []const u8) !*Object {
         var string = std.ArrayList(u8).init(self.allocator);
         for (slice) |byte| {
             try string.append(byte);
         }
         var memory = try self.allocator.create(Object);
-        memory.* = .{ .String = string };
+        memory.* = .{ .marked = false, .data = .{ .String = string } };
         return memory;
     }
 
-    pub fn named_function(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !*Object {
+    pub fn namedFunction(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !*Object {
         var nameF = std.ArrayList(u8).init(self.allocator);
         for (name) |byte| {
             try nameF.append(byte);
         }
         var memory = try self.allocator.create(Object);
-        memory.* = .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } };
+        memory.* = .{
+            .marked = false,
+            .data = .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } },
+        };
         return memory;
     }
 
-    pub fn native_function(self: *VirtualMachine, arity: u8, function: *const fn (*VirtualMachine, usize) Value) !*Object {
+    pub fn nativeFunction(self: *VirtualMachine, arity: u8, function: *const fn (*VirtualMachine, usize) Value) !*Object {
         var memory = try self.allocator.create(Object);
-        memory.* = .{ .Native = .{ .arity = arity, .function = function } };
+        memory.* = .{
+            .marked = false,
+            .data = .{ .Native = .{ .arity = arity, .function = function } },
+        };
         return memory;
     }
 
     pub fn closure(self: *VirtualMachine, function: *Object, upvalues: std.ArrayList(*Object)) !*Object {
         var memory = try self.allocator.create(Object);
-        memory.* = .{ .Closure = .{ .function = function, .upvalues = upvalues } };
+        memory.* = .{ .marked = false, .data = .{ .Closure = .{ .function = function, .upvalues = upvalues } } };
         return memory;
     }
 };
 
-pub const Object = union(enum) {
-    String: std.ArrayList(u8),
-    Function: struct {
-        arity: u8,
-        upvalues: usize,
-        chunk: Chunk,
-        name: std.ArrayList(u8),
-    },
-    Native: struct {
-        arity: u8,
-        function: *const fn (*VirtualMachine, usize) Value,
-    },
-    Closure: struct {
-        function: *const Object,
-        upvalues: std.ArrayList(*Object),
-    },
-    // Upvalues can point to values on the stack, or they can own the value.
-    // Open upvalues are upvalues that point to values on the stack.
-    // Closed upvalues are upvalues that own the values.
-    Upvalue: union(enum) {
-        Open: struct { location: *Value },
-        Closed: struct { owned: Value },
+// I think we actually need to use a struct here because of the gc
+
+pub const Object = struct {
+    marked: bool,
+    data: union(enum) {
+        String: std.ArrayList(u8),
+        Function: struct {
+            arity: u8,
+            upvalues: usize,
+            chunk: Chunk,
+            name: std.ArrayList(u8),
+        },
+        Native: struct {
+            arity: u8,
+            function: *const fn (*VirtualMachine, usize) Value,
+        },
+        Closure: struct {
+            function: *const Object,
+            upvalues: std.ArrayList(*Object),
+        },
+        // Upvalues can point to values on the stack, or they can own the value.
+        // Open upvalues are upvalues that point to values on the stack.
+        // Closed upvalues are upvalues that own the values.
+        Upvalue: union(enum) {
+            Open: struct { location: *Value },
+            Closed: struct { owned: Value },
+        },
     },
 
     pub fn deinit(self: *Object, allocator: std.mem.Allocator) void {
-        switch (self.*) {
+        switch (self.data) {
             .String => {
-                self.String.deinit();
+                self.data.String.deinit();
             },
             .Function => {
-                self.Function.chunk.deinit();
-                self.Function.name.deinit();
+                self.data.Function.chunk.deinit();
+                self.data.Function.name.deinit();
             },
             .Native => {},
             .Closure => {
-                for (self.Closure.upvalues.items) |upvalue| {
+                for (self.data.Closure.upvalues.items) |upvalue| {
                     allocator.destroy(upvalue);
                 }
-                self.Closure.upvalues.deinit();
+                self.data.Closure.upvalues.deinit();
             },
             .Upvalue => {},
         }
     }
 
     pub fn print(self: *Object, offset: usize) void {
-        switch (self.*) {
+        switch (self.data) {
             .String => |s| {
                 std.debug.print("{x:4}    \"{s}\"\n", .{ offset, s.items });
             },
@@ -397,7 +411,7 @@ pub const Object = union(enum) {
                 std.debug.print("{x:4}    native/{}\n", .{ offset, n.arity });
             },
             .Closure => |c| {
-                std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.Function.arity, c.function.Function.name.items });
+                std.debug.print("{x:4}    closure/{} \"{s}\"\n", .{ offset, c.function.data.Function.arity, c.function.data.Function.name.items });
             },
             .Upvalue => |u| {
                 _ = u;
@@ -412,7 +426,7 @@ pub const Object = union(enum) {
 pub const CallFrame = struct {
     function: *Object,
     ip: [*]OpCode,
-    stackBase: usize,
+    stack_base: usize,
 };
 
 pub const Value = union(enum) {
@@ -517,25 +531,25 @@ pub const OpCode = union(enum) {
 
 pub const Chunk = struct {
     code: std.ArrayList(OpCode),
-    lineNumbers: std.ArrayList(u32),
+    line_numbers: std.ArrayList(u32),
 
     pub fn init(allocator: std.mem.Allocator) Chunk {
         return Chunk{
             .code = std.ArrayList(OpCode).init(allocator),
-            .lineNumbers = std.ArrayList(u32).init(allocator),
+            .line_numbers = std.ArrayList(u32).init(allocator),
         };
     }
 
     pub fn deinit(self: *Chunk) void {
         self.code.deinit();
-        self.lineNumbers.deinit();
+        self.line_numbers.deinit();
     }
 
     pub fn disassemble(self: *const Chunk, name: []const u8) void {
         std.debug.print("== {s} ==\n", .{name});
 
         for (self.code.items) |instruction, offset| {
-            const line = self.lineNumbers.items[offset];
+            const line = self.line_numbers.items[offset];
             switch (instruction) {
                 .Return => {
                     std.debug.print("{x:4}    {d} return\n", .{ offset, line });
@@ -615,7 +629,7 @@ pub const Chunk = struct {
 
     pub fn addInstruction(self: *Chunk, instruction: OpCode, line: u32) !usize {
         try self.code.append(instruction);
-        try self.lineNumbers.append(line);
+        try self.line_numbers.append(line);
         return self.code.items.len - 1;
     }
 };
@@ -624,8 +638,8 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
     // TODO: can we pop here safely?
     //       what if the GC kicks in and frees the object?
     //       we should probably move the functions to the constant pool
-    const fIndex = vm.stack.pop();
-    const fObject = switch (fIndex) {
+    const index = vm.stack.pop();
+    const object = switch (index) {
         .Object => |o| o,
         else => {
             std.debug.print("Expected object on the stack\n", .{});
@@ -633,13 +647,13 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
         },
     };
 
-    switch (fObject.*) {
+    switch (object.data) {
         .Function => {
-            var lenUpvalues = fObject.Function.upvalues;
+            var len_upvalues = object.data.Function.upvalues;
             var upvalues = std.ArrayList(*Object).init(vm.allocator);
-            while (lenUpvalues > 0) {
+            while (len_upvalues > 0) {
                 frame.ip += 1;
-                lenUpvalues -= 1;
+                len_upvalues -= 1;
                 switch (frame.ip[0]) {
                     .CaptureUpvalue => {
                         try captureUpvalue(vm, frame, &upvalues, frame.ip[0]);
@@ -650,7 +664,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
                     },
                 }
             }
-            const closure = try vm.closure(fObject, upvalues);
+            const closure = try vm.closure(object, upvalues);
             _ = try vm.takeObjectOwnership(closure);
             _ = vm.stack.appendAssumeCapacity(.{ .Object = closure });
         },
@@ -667,19 +681,19 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
         var previous: ?*std.SinglyLinkedList(*Object).Node = null;
         var current = vm.upvalues.first;
 
-        while (current != null and @ptrToInt(current.?.data.Upvalue.Open.location) > @ptrToInt(&vm.stack.items[frame.stackBase + u.index])) {
+        while (current != null and @ptrToInt(current.?.data.data.Upvalue.Open.location) > @ptrToInt(&vm.stack.items[frame.stack_base + u.index])) {
             previous = current;
             current = current.?.next;
         }
 
-        if (current != null and current.?.data.Upvalue.Open.location == &vm.stack.items[frame.stackBase + u.index]) {
+        if (current != null and current.?.data.data.Upvalue.Open.location == &vm.stack.items[frame.stack_base + u.index]) {
             try upvalues.append(current.?.data);
             // frame.function.Closure.upvalues.items[u.index] = current.?.data;
         } else {
             const memory = try vm.allocator.create(Object);
-            const value = &vm.stack.items[frame.stackBase + u.index];
+            const value = &vm.stack.items[frame.stack_base + u.index];
             const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
-            memory.* = upvalue;
+            memory.* = .{ .marked = false, .data = upvalue };
             try upvalues.append(memory);
             // frame.function.Closure.upvalues.items[u.index] = memory;
 
@@ -693,7 +707,7 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
         }
     } else {
         var memory = try vm.allocator.create(Object);
-        const upvalue = frame.function.Closure.upvalues.items[u.index];
+        const upvalue = frame.function.data.Closure.upvalues.items[u.index];
         memory.* = upvalue.*;
         try upvalues.append(memory);
     }
@@ -718,22 +732,22 @@ fn interpretJumpBack(frame: *CallFrame, offset: u32) !void {
 }
 
 fn interpretStoreUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
-    switch (frame.function.*) {
+    switch (frame.function.data) {
         .Closure => {},
         else => {
             std.debug.print("Invalid closure\n", .{});
             return error.NotAClosure;
         },
     }
-    const upvalue = frame.function.Closure.upvalues.items[index];
-    switch (upvalue.*) {
+    const upvalue = frame.function.data.Closure.upvalues.items[index];
+    switch (upvalue.data) {
         .Upvalue => |u| {
             switch (u) {
                 .Open => {
-                    upvalue.Upvalue.Open.location.* = vm.stack.items[vm.stack.items.len - 1];
+                    upvalue.data.Upvalue.Open.location.* = vm.stack.items[vm.stack.items.len - 1];
                 },
                 .Closed => {
-                    upvalue.Upvalue.Closed.owned = vm.stack.items[vm.stack.items.len - 1];
+                    upvalue.data.Upvalue.Closed.owned = vm.stack.items[vm.stack.items.len - 1];
                 },
             }
         },
@@ -745,22 +759,22 @@ fn interpretStoreUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !
 }
 
 fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
-    const closure = switch (frame.function.*) {
-        .Closure => frame.function.Closure,
+    const closure = switch (frame.function.data) {
+        .Closure => frame.function.data.Closure,
         else => {
             std.debug.print("Invalid closure\n", .{});
             return error.NotAClosure;
         },
     };
     const upvalue = closure.upvalues.items[index];
-    switch (upvalue.*) {
+    switch (upvalue.data) {
         .Upvalue => |u| {
             switch (u) {
                 .Open => {
-                    vm.stack.appendAssumeCapacity(upvalue.Upvalue.Open.location.*);
+                    vm.stack.appendAssumeCapacity(upvalue.data.Upvalue.Open.location.*);
                 },
                 .Closed => {
-                    vm.stack.appendAssumeCapacity(upvalue.Upvalue.Closed.owned);
+                    vm.stack.appendAssumeCapacity(upvalue.data.Upvalue.Closed.owned);
                 },
             }
         },
@@ -774,16 +788,16 @@ fn interpretLoadUpvalue(vm: *VirtualMachine, frame: *CallFrame, index: usize) !v
 /// Stores the value on top of the stack in the global variable at the given index.
 /// Does not pop the value from the stack.
 fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
-    const nameIndex = vm.constants.items[index];
-    const nameObject = switch (nameIndex) {
+    const name_index = vm.constants.items[index];
+    const object = switch (name_index) {
         .Object => |o| o,
         else => {
             std.debug.print("Invalid global name index\n", .{});
             return error.InvalidGlobalNameIndex;
         },
     };
-    const name = switch (nameObject.*) {
-        .String => nameObject.String,
+    const name = switch (object.data) {
+        .String => |v| v,
         else => {
             std.debug.print("Invalid global name\n", .{});
             return error.InvalidGlobalName;
@@ -793,16 +807,16 @@ fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
 }
 
 fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
-    const nameIndex = vm.constants.items[index];
-    const nameObject = switch (nameIndex) {
+    const name_index = vm.constants.items[index];
+    const object = switch (name_index) {
         .Object => |o| o,
         else => {
             std.debug.print("Invalid global name index\n", .{});
             return error.InvalidGlobalNameIndex;
         },
     };
-    const name = switch (nameObject.*) {
-        .String => nameObject.String,
+    const name = switch (object.data) {
+        .String => |v| v,
         else => {
             std.debug.print("Invalid global name\n", .{});
             return error.InvalidGlobalName;
@@ -818,11 +832,11 @@ fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
 /// Stores the value on top of the stack in the local variable at the given index.
 /// Does not pop the value from the stack.
 fn interpretStoreLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
-    vm.stack.items[index] = vm.stack.items[vm.stack.items.len - 1 + frame.stackBase];
+    vm.stack.items[index] = vm.stack.items[vm.stack.items.len - 1 + frame.stack_base];
 }
 
 fn interpretLoadLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !void {
-    vm.stack.appendAssumeCapacity(vm.stack.items[index + frame.stackBase]);
+    vm.stack.appendAssumeCapacity(vm.stack.items[index + frame.stack_base]);
 }
 
 fn interpretLoadConstant(vm: *VirtualMachine, index: usize) !void {
