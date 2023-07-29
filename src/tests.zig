@@ -1,8 +1,13 @@
 const std = @import("std");
 const main = @import("main.zig");
+const gc = @import("gc.zig");
 
 test "add i64 constant" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
     defer vm.deinit();
     const index = try vm.addConstant(.{ .I64 = 42 });
     try std.testing.expectEqual(@as(usize, 1), vm.constants.items.len);
@@ -18,7 +23,12 @@ test "add return instruction" {
 }
 
 test "interpret return" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const nil = try vm.addConstant(.Nil);
@@ -37,7 +47,12 @@ test "interpret return" {
 }
 
 test "interpret constant" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -55,7 +70,12 @@ test "interpret constant" {
 }
 
 test "interpret 1 + 2" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -76,7 +96,12 @@ test "interpret 1 + 2" {
 }
 
 test "interpret 1 - 2" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -97,7 +122,12 @@ test "interpret 1 - 2" {
 }
 
 test "interpret 10u64 - 7u64" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -118,7 +148,12 @@ test "interpret 10u64 - 7u64" {
 }
 
 test "interpret not(nil)" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -137,7 +172,12 @@ test "interpret not(nil)" {
 }
 
 test "interpret not(10.7)" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -156,7 +196,12 @@ test "interpret not(10.7)" {
 }
 
 test "interpret (1 + 2.5) results in type mismatch" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -179,7 +224,12 @@ test "interpret (1 + 2.5) results in type mismatch" {
 }
 
 test "interpret set global" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -201,7 +251,12 @@ test "interpret set global" {
 }
 
 test "interpret read global" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -224,7 +279,12 @@ test "interpret read global" {
 }
 
 test "interpret jump over one instruction" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -243,7 +303,12 @@ test "interpret jump over one instruction" {
 }
 
 test "interpret jump if false with nil on the stack" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -262,7 +327,12 @@ test "interpret jump if false with nil on the stack" {
 }
 
 test "interpret jump if false with true on the stack" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
@@ -281,7 +351,12 @@ test "interpret jump if false with true on the stack" {
 }
 
 test "interpret jump back" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const nil_index = try vm.addConstant(.Nil);
@@ -303,7 +378,12 @@ test "interpret jump back" {
 test "interpret fn call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const true_index = try vm.addConstant(.True);
@@ -331,7 +411,12 @@ test "interpret fn call" {
 test "interpret closure call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const true_index = try vm.addConstant(.True);
@@ -379,7 +464,12 @@ test "interpret closure call with an open local upmain.Value" {
     //   capture local 0
     //   call
     //   return
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const true_index = try vm.addConstant(.True);
@@ -438,7 +528,12 @@ test "interpret closure call with an open non-local upvalue" {
     //   capture local 0
     //   call
     //   return
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const true_index = try vm.addConstant(.True);
@@ -504,7 +599,12 @@ test "interpret closure call with a closed upvalue" {
     //   call
     //   call
     //   return
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const true_index = try vm.addConstant(.True);
@@ -540,7 +640,12 @@ test "interpret closure call with a closed upvalue" {
 }
 
 test "interpret calling 1" {
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
 
     const one_index = try vm.addConstant(.{ .U64 = 1 });
@@ -571,18 +676,17 @@ fn nativeFnTest(vm: *main.VirtualMachine, arity: usize) main.Value {
 
 test "interpret native fn call" {
     // A simple function that accepts one argument and returns main.Value.True.
-    var vm = try main.VirtualMachine.init(std.testing.allocator);
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
     defer vm.deinit();
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
-    var native = try std.testing.allocator.create(main.Object);
-    native.* = .{
-        .marked = false,
-        .data = .{ .Native = .{
-            .arity = 1,
-            .function = &nativeFnTest,
-        } },
-    };
+    var native = try vm.runtime_allocator.create(main.Object);
+    native.* = main.Object.native(1, &nativeFnTest);
 
     const native_index = try vm.addConstant(.{ .Object = native });
     const main_fn_index = try vm.addConstant(.{ .Object = try vm.namedFunction("main", 0, 0) });
