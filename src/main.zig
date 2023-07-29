@@ -1,13 +1,22 @@
 const std = @import("std");
+const gc = @import("gc.zig");
 
 pub fn main() !void {
+    var gca = gc.init();
+    defer {
+        _ = gca.deinit();
+    }
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
     defer {
         const deinit_status = gpa.deinit();
         _ = deinit_status;
     }
-    var vm = try VirtualMachine.init(allocator);
+
+    const allocator = gpa.allocator();
+    const runtime_allocator = gca.allocator();
+
+    var vm = try VirtualMachine.init(allocator, runtime_allocator);
     defer vm.deinit();
 
     const main_fn = try vm.namedFunction("main", 0, 0);
@@ -34,9 +43,7 @@ pub fn main() !void {
 }
 
 fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
-    if (arity != 1) {
-        unreachable;
-    }
+    _ = arity;
     const string_index = vm.stack.pop();
     const string = string_index.Object.data.String;
     std.debug.print("{s}", .{string.items});
@@ -47,6 +54,7 @@ pub const TypeMismatchError = error.TypeMismatch;
 
 pub const VirtualMachine = struct {
     allocator: std.mem.Allocator,
+    runtime_allocator: std.mem.Allocator,
     frames: std.ArrayList(CallFrame),
     stack: std.ArrayList(Value),
     constants: std.ArrayList(Value),
@@ -59,16 +67,17 @@ pub const VirtualMachine = struct {
     objects: std.ArrayList(*Object),
     globals: std.StringHashMap(Value),
 
-    pub fn init(allocator: std.mem.Allocator) !VirtualMachine {
-        const stack = try std.ArrayList(Value).initCapacity(allocator, 1024 * 1024 * 16);
+    pub fn init(inner_allocator: std.mem.Allocator, runtime_allocator: std.mem.Allocator) !VirtualMachine {
+        const stack = try std.ArrayList(Value).initCapacity(inner_allocator, 1024 * 1024 * 16);
         return VirtualMachine{
-            .allocator = allocator,
-            .frames = std.ArrayList(CallFrame).init(allocator),
+            .allocator = inner_allocator,
+            .runtime_allocator = runtime_allocator,
+            .frames = std.ArrayList(CallFrame).init(inner_allocator),
             .stack = stack,
-            .constants = std.ArrayList(Value).init(allocator),
+            .constants = std.ArrayList(Value).init(inner_allocator),
             .upvalues = std.SinglyLinkedList(*Object){},
-            .objects = std.ArrayList(*Object).init(allocator),
-            .globals = std.StringHashMap(Value).init(allocator),
+            .objects = std.ArrayList(*Object).init(inner_allocator),
+            .globals = std.StringHashMap(Value).init(inner_allocator),
         };
     }
 
@@ -78,16 +87,16 @@ pub const VirtualMachine = struct {
         for (self.constants.items) |v| {
             switch (v) {
                 .Object => |object| {
-                    object.deinit(self.allocator);
-                    self.allocator.destroy(object);
+                    object.deinit();
+                    self.runtime_allocator.destroy(object);
                 },
                 else => {},
             }
         }
         self.constants.deinit();
         for (self.objects.items) |object| {
-            object.deinit(self.allocator);
-            self.allocator.destroy(object);
+            object.deinit();
+            self.runtime_allocator.destroy(object);
         }
         self.objects.deinit();
         self.globals.deinit();
@@ -301,10 +310,7 @@ pub const VirtualMachine = struct {
             it = node.next;
             var upvalue = node.data;
             if (@intFromPtr(upvalue.data.Upvalue.Open.location) >= @intFromPtr(stackPointer)) {
-                upvalue.* = .{
-                    .marked = false,
-                    .data = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.data.Upvalue.Open.location.* } } },
-                };
+                upvalue.* = Object.closed_upvalue(upvalue.data.Upvalue.Open.location.*);
                 self.upvalues.remove(node);
                 self.allocator.destroy(node);
             } else {
@@ -318,36 +324,30 @@ pub const VirtualMachine = struct {
         for (slice) |byte| {
             try string.append(byte);
         }
-        var memory = try self.allocator.create(Object);
-        memory.* = .{ .marked = false, .data = .{ .String = string } };
+        var memory = try self.runtime_allocator.create(Object);
+        memory.* = Object.string(string);
         return memory;
     }
 
     pub fn namedFunction(self: *VirtualMachine, name: []const u8, arity: u8, upvalues: usize) !*Object {
-        var nameF = std.ArrayList(u8).init(self.allocator);
+        var nameF = std.ArrayList(u8).init(self.runtime_allocator);
         for (name) |byte| {
             try nameF.append(byte);
         }
-        var memory = try self.allocator.create(Object);
-        memory.* = .{
-            .marked = false,
-            .data = .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = Chunk.init(self.allocator), .name = nameF } },
-        };
+        var memory = try self.runtime_allocator.create(Object);
+        memory.* = Object.function(arity, upvalues, Chunk.init(self.allocator), nameF);
         return memory;
     }
 
     pub fn nativeFunction(self: *VirtualMachine, arity: u8, function: *const fn (*VirtualMachine, usize) Value) !*Object {
-        var memory = try self.allocator.create(Object);
-        memory.* = .{
-            .marked = false,
-            .data = .{ .Native = .{ .arity = arity, .function = function } },
-        };
+        var memory = try self.runtime_allocator.create(Object);
+        memory.* = Object.native(arity, function);
         return memory;
     }
 
     pub fn closure(self: *VirtualMachine, function: *Object, upvalues: std.ArrayList(*Object)) !*Object {
-        var memory = try self.allocator.create(Object);
-        memory.* = .{ .marked = false, .data = .{ .Closure = .{ .function = function, .upvalues = upvalues } } };
+        var memory = try self.runtime_allocator.create(Object);
+        memory.* = Object.closure(self.runtime_allocator, function, upvalues);
         return memory;
     }
 };
@@ -369,6 +369,7 @@ pub const Object = struct {
             function: *const fn (*VirtualMachine, usize) Value,
         },
         Closure: struct {
+            allocator: std.mem.Allocator,
             function: *const Object,
             upvalues: std.ArrayList(*Object),
         },
@@ -381,7 +382,53 @@ pub const Object = struct {
         },
     },
 
-    pub fn deinit(self: *Object, allocator: std.mem.Allocator) void {
+    pub fn string(s: std.ArrayList(u8)) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .String = s },
+        };
+    }
+
+    pub fn function(arity: u8, upvalues: usize, chunk: Chunk, name: std.ArrayList(u8)) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .Function = .{ .arity = arity, .upvalues = upvalues, .chunk = chunk, .name = name } },
+        };
+    }
+
+    pub fn native(arity: u8, f: *const fn (*VirtualMachine, usize) Value) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .Native = .{ .arity = arity, .function = f } },
+        };
+    }
+
+    pub fn closure(allocator: std.mem.Allocator, f: *const Object, upvalues: std.ArrayList(*Object)) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .Closure = .{
+                .function = f,
+                .upvalues = upvalues,
+                .allocator = allocator,
+            } },
+        };
+    }
+
+    pub fn open_upvalue(location: *Value) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .Upvalue = .{ .Open = .{ .location = location } } },
+        };
+    }
+
+    pub fn closed_upvalue(owned: Value) Object {
+        return Object{
+            .marked = false,
+            .data = .{ .Upvalue = .{ .Closed = .{ .owned = owned } } },
+        };
+    }
+
+    pub fn deinit(self: *Object) void {
         switch (self.data) {
             .String => {
                 self.data.String.deinit();
@@ -393,7 +440,7 @@ pub const Object = struct {
             .Native => {},
             .Closure => {
                 for (self.data.Closure.upvalues.items) |upvalue| {
-                    allocator.destroy(upvalue);
+                    self.data.Closure.allocator.destroy(upvalue);
                 }
                 self.data.Closure.upvalues.deinit();
             },
@@ -637,9 +684,6 @@ pub const Chunk = struct {
 };
 
 fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
-    // TODO: can we pop here safely?
-    //       what if the GC kicks in and frees the object?
-    //       we should probably move the functions to the constant pool
     const index = vm.stack.pop();
     const object = switch (index) {
         .Object => |o| o,
@@ -690,14 +734,12 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
 
         if (current != null and current.?.data.data.Upvalue.Open.location == &vm.stack.items[frame.stack_base + u.index]) {
             try upvalues.append(current.?.data);
-            // frame.function.Closure.upvalues.items[u.index] = current.?.data;
         } else {
-            const memory = try vm.allocator.create(Object);
+            const memory = try vm.runtime_allocator.create(Object);
             const value = &vm.stack.items[frame.stack_base + u.index];
             const upvalue = .{ .Upvalue = .{ .Open = .{ .location = value } } };
             memory.* = .{ .marked = false, .data = upvalue };
             try upvalues.append(memory);
-            // frame.function.Closure.upvalues.items[u.index] = memory;
 
             var node = try vm.allocator.create(std.SinglyLinkedList(*Object).Node);
             node.data = memory;
@@ -708,7 +750,7 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
             }
         }
     } else {
-        var memory = try vm.allocator.create(Object);
+        var memory = try vm.runtime_allocator.create(Object);
         const upvalue = frame.function.data.Closure.upvalues.items[u.index];
         memory.* = upvalue.*;
         try upvalues.append(memory);
