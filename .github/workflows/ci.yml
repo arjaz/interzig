@@ -1,0 +1,30 @@
+# This is a workflow that runs the tests on each commit/PR to master
+
+name: CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so the job can access it
+      - uses: actions/checkout@v3
+
+      - name: Install Zig using Snap
+        run: |
+          # Install the Zig Snap package
+          sudo snap install zig --classic --beta
+          
+      - name: Zig Test
+        run: zig build test
