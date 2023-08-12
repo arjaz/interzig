@@ -23,7 +23,7 @@ pub fn main() !void {
     _ = try main_fn.data.Function.chunk.addInstruction(.Call, 0);
     _ = try main_fn.data.Function.chunk.addInstruction(.Return, 0);
 
-    const main_frame = CallFrame{ .ip = @ptrCast([*]OpCode, &main_fn.data.Function.chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const main_frame = CallFrame{ .ip = @as([*]OpCode, @ptrCast(&main_fn.data.Function.chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(main_frame);
     _ = try vm.interpret();
 
@@ -42,6 +42,8 @@ fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
     std.debug.print("{s}", .{string.items});
     return Value.Nil;
 }
+
+pub const TypeMismatchError = error.TypeMismatch;
 
 pub const VirtualMachine = struct {
     allocator: std.mem.Allocator,
@@ -99,7 +101,7 @@ pub const VirtualMachine = struct {
 
     pub fn printStack(self: *VirtualMachine) void {
         std.debug.print("=== Stack ===\n", .{});
-        for (self.stack.items) |value, offset| {
+        for (self.stack.items, 0..) |value, offset| {
             switch (value) {
                 .I64 => |v| std.debug.print("{x:4}    {} i64\n", .{ offset, v }),
                 .U64 => |v| std.debug.print("{x:4}    {} u64\n", .{ offset, v }),
@@ -113,21 +115,21 @@ pub const VirtualMachine = struct {
 
     pub fn printConstants(self: *VirtualMachine) void {
         std.debug.print("=== Constants ===\n", .{});
-        for (self.constants.items) |constant, offset| {
+        for (self.constants.items, 0..) |constant, offset| {
             constant.print(offset);
         }
     }
 
     pub fn printObjects(self: *VirtualMachine) void {
         std.debug.print("=== Objects ===\n", .{});
-        for (self.objects.items) |object, offset| {
+        for (self.objects.items, 0..) |object, offset| {
             object.print(offset);
         }
     }
 
     pub fn printTrace(self: *VirtualMachine) void {
         std.debug.print("=== Trace ===\n", .{});
-        for (self.frames.items) |frame, offset| {
+        for (self.frames.items, 0..) |frame, offset| {
             // The function can point to either a Function or a Closure.
             const function = switch (frame.function.data) {
                 .Function => frame.function.data.Function,
@@ -199,13 +201,13 @@ pub const VirtualMachine = struct {
                         .Object => |o| o,
                         else => {
                             std.debug.print("Expected object on the stack, found: {}\n", .{index});
-                            return error.TypeMismatch;
+                            return TypeMismatchError;
                         },
                     };
                     switch (object.data) {
                         .Function => |f| {
                             const new_frame = CallFrame{
-                                .ip = @ptrCast([*]OpCode, &f.chunk.code.items[0]),
+                                .ip = @as([*]OpCode, @ptrCast(&f.chunk.code.items[0])),
                                 .function = object,
                                 .stack_base = self.stack.items.len - f.arity,
                             };
@@ -216,7 +218,7 @@ pub const VirtualMachine = struct {
                         },
                         .Closure => |c| {
                             const new_frame = CallFrame{
-                                .ip = @ptrCast([*]OpCode, &c.function.data.Function.chunk.code.items[0]),
+                                .ip = @as([*]OpCode, @ptrCast(&c.function.data.Function.chunk.code.items[0])),
                                 .function = object,
                                 .stack_base = self.stack.items.len - c.function.data.Function.arity,
                             };
@@ -231,7 +233,7 @@ pub const VirtualMachine = struct {
                         },
                         else => {
                             std.debug.print("Expected function on the stack\n", .{});
-                            return error.TypeMismatch;
+                            return TypeMismatchError;
                         },
                     }
                 },
@@ -298,7 +300,7 @@ pub const VirtualMachine = struct {
         while (it) |node| {
             it = node.next;
             var upvalue = node.data;
-            if (@ptrToInt(upvalue.data.Upvalue.Open.location) >= @ptrToInt(stackPointer)) {
+            if (@intFromPtr(upvalue.data.Upvalue.Open.location) >= @intFromPtr(stackPointer)) {
                 upvalue.* = .{
                     .marked = false,
                     .data = .{ .Upvalue = .{ .Closed = .{ .owned = upvalue.data.Upvalue.Open.location.* } } },
@@ -548,7 +550,7 @@ pub const Chunk = struct {
     pub fn disassemble(self: *const Chunk, name: []const u8) void {
         std.debug.print("== {s} ==\n", .{name});
 
-        for (self.code.items) |instruction, offset| {
+        for (self.code.items, 0..) |instruction, offset| {
             const line = self.line_numbers.items[offset];
             switch (instruction) {
                 .Return => {
@@ -643,7 +645,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
         .Object => |o| o,
         else => {
             std.debug.print("Expected object on the stack\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     };
 
@@ -670,7 +672,7 @@ fn interpretAsClosure(vm: *VirtualMachine, frame: *CallFrame) !void {
         },
         else => {
             std.debug.print("Expected function on the stack\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     }
 }
@@ -681,7 +683,7 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
         var previous: ?*std.SinglyLinkedList(*Object).Node = null;
         var current = vm.upvalues.first;
 
-        while (current != null and @ptrToInt(current.?.data.data.Upvalue.Open.location) > @ptrToInt(&vm.stack.items[frame.stack_base + u.index])) {
+        while (current != null and @intFromPtr(current.?.data.data.Upvalue.Open.location) > @intFromPtr(&vm.stack.items[frame.stack_base + u.index])) {
             previous = current;
             current = current.?.next;
         }
@@ -860,7 +862,7 @@ fn interpretAdd(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
@@ -871,13 +873,13 @@ fn interpretAdd(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
         else => {
             std.debug.print("Unsupported type for add\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     }
 }
@@ -893,7 +895,7 @@ fn interpretSub(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
@@ -904,13 +906,13 @@ fn interpretSub(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
         else => {
             std.debug.print("Unsupported type for sub\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     }
 }
@@ -926,13 +928,13 @@ fn interpretAddF(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for add\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
         else => {
             std.debug.print("Unsupported type for add\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     }
 }
@@ -948,13 +950,13 @@ fn interpretSubF(vm: *VirtualMachine) !void {
                 },
                 else => {
                     std.debug.print("Unsupported type for sub\n", .{});
-                    return error.TypeMismatch;
+                    return TypeMismatchError;
                 },
             }
         },
         else => {
             std.debug.print("Unsupported type for sub\n", .{});
-            return error.TypeMismatch;
+            return TypeMismatchError;
         },
     }
 }

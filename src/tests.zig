@@ -29,7 +29,7 @@ test "interpret return" {
     _ = try chunk.addInstruction(.{ .LoadConstant = nil }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
@@ -47,7 +47,7 @@ test "interpret constant" {
     _ = try chunk.addInstruction(.{ .LoadConstant = index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = 42 }, result);
@@ -68,7 +68,7 @@ test "interpret 1 + 2" {
     _ = try chunk.addInstruction(.Add, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = 3 }, result);
@@ -89,7 +89,7 @@ test "interpret 1 - 2" {
     _ = try chunk.addInstruction(.Sub, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .I64 = -1 }, result);
@@ -110,7 +110,7 @@ test "interpret 10u64 - 7u64" {
     _ = try chunk.addInstruction(.Sub, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value{ .U64 = 3 }, result);
@@ -129,7 +129,7 @@ test "interpret not(nil)" {
     _ = try chunk.addInstruction(.Not, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -148,7 +148,7 @@ test "interpret not(10.7)" {
     _ = try chunk.addInstruction(.Not, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
@@ -169,10 +169,10 @@ test "interpret (1 + 2.5) results in type mismatch" {
     _ = try chunk.addInstruction(.Add, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = vm.interpret() catch |err| {
-        try std.testing.expectEqual(err, error.TypeMismatch);
+        try std.testing.expectEqual(err, main.TypeMismatchError);
         return;
     };
     try std.testing.expect(false);
@@ -192,7 +192,7 @@ test "interpret set global" {
     _ = try chunk.addInstruction(.{ .StoreGlobal = global_constant_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -216,7 +216,7 @@ test "interpret read global" {
     _ = try chunk.addInstruction(.{ .LoadGlobal = global_constant_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -236,7 +236,7 @@ test "interpret jump over one instruction" {
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
@@ -255,7 +255,7 @@ test "interpret jump if false with nil on the stack" {
     _ = try chunk.addInstruction(.{ .LoadConstant = nil_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
@@ -274,7 +274,7 @@ test "interpret jump if false with true on the stack" {
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
@@ -293,7 +293,7 @@ test "interpret jump back" {
     _ = try chunk.addInstruction(.Return, 0);
     _ = try chunk.addInstruction(.{ .JumpBack = 2 }, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.Nil, result);
@@ -321,7 +321,7 @@ test "interpret fn call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -350,7 +350,7 @@ test "interpret closure call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -400,7 +400,7 @@ test "interpret closure call with an open local upmain.Value" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -468,7 +468,7 @@ test "interpret closure call with an open non-local upvalue" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -532,7 +532,7 @@ test "interpret closure call with a closed upvalue" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
@@ -552,7 +552,7 @@ test "interpret calling 1" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = vm.interpret() catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
@@ -593,7 +593,7 @@ test "interpret native fn call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @ptrCast([*]main.OpCode, &main_chunk.code.items[0]), .function = main_fn, .stack_base = 0 };
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
