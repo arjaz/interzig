@@ -3,7 +3,7 @@ const main = @import("main.zig");
 const gc = @import("gc.zig");
 
 test "add i64 constant" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -23,7 +23,7 @@ test "add return instruction" {
 }
 
 test "interpret return" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -49,7 +49,7 @@ test "interpret return" {
 }
 
 test "interpret constant" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -74,7 +74,7 @@ test "interpret constant" {
 }
 
 test "interpret 1 + 2" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -102,7 +102,7 @@ test "interpret 1 + 2" {
 }
 
 test "interpret 1 - 2" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -130,7 +130,7 @@ test "interpret 1 - 2" {
 }
 
 test "interpret 10u64 - 7u64" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -158,7 +158,7 @@ test "interpret 10u64 - 7u64" {
 }
 
 test "interpret not(nil)" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -184,7 +184,7 @@ test "interpret not(nil)" {
 }
 
 test "interpret not(10.7)" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -210,7 +210,7 @@ test "interpret not(10.7)" {
 }
 
 test "interpret (1 + 2.5) results in type mismatch" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -240,7 +240,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
 }
 
 test "interpret set global" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -270,7 +270,7 @@ test "interpret set global" {
 }
 
 test "interpret read global" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -301,7 +301,7 @@ test "interpret read global" {
 }
 
 test "interpret jump over one instruction" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -327,7 +327,7 @@ test "interpret jump over one instruction" {
 }
 
 test "interpret jump if false with nil on the stack" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -353,7 +353,7 @@ test "interpret jump if false with nil on the stack" {
 }
 
 test "interpret jump if false with true on the stack" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -379,7 +379,7 @@ test "interpret jump if false with true on the stack" {
 }
 
 test "interpret jump back" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -408,7 +408,7 @@ test "interpret jump back" {
 test "interpret fn call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -445,7 +445,7 @@ test "interpret fn call" {
 test "interpret closure call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -502,7 +502,7 @@ test "interpret closure call with an open local upvalue" {
     //   capture local 0
     //   call
     //   return
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -570,7 +570,7 @@ test "interpret closure call with an open non-local upvalue" {
     //   capture local 0
     //   call
     //   return
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -647,7 +647,7 @@ test "interpret closure call with a closed upvalue" {
     //   call
     //   call
     //   return
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -694,7 +694,7 @@ test "interpret closure call with a closed upvalue" {
 }
 
 test "interpret calling 1" {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }
@@ -732,7 +732,7 @@ fn nativeFnTest(vm: *main.VirtualMachine, arity: usize) main.Value {
 
 test "interpret native fn call" {
     // A simple function that accepts one argument and returns main.Value.True.
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init();
     defer {
         _ = gca.deinit();
     }

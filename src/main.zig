@@ -2,7 +2,7 @@ const std = @import("std");
 const gc = @import("gc.zig");
 
 pub fn main() !void {
-    var gca = gc.init();
+    var gca = gc.GarbageCollector(.{}).init();
     defer {
         _ = gca.deinit();
     }
