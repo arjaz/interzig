@@ -360,8 +360,6 @@ pub const VirtualMachine = struct {
     }
 };
 
-// I think we actually need to use a struct here because of the gc
-
 pub const Object = struct {
     marked: bool,
     data: union(enum) {
