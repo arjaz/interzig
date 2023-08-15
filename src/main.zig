@@ -20,11 +20,14 @@ pub fn main() !void {
     defer vm.deinit();
 
     const main_fn = try vm.namedFunction("main", 0, 0);
+    _ = try vm.takeObjectOwnership(main_fn);
     _ = try vm.addConstant(.{ .Object = main_fn });
 
     const out_string = try vm.stringFromU8Slice("I love Helga\n");
+    _ = try vm.takeObjectOwnership(out_string);
     const str_index = try vm.addConstant(.{ .Object = out_string });
     const native_print = try vm.nativeFunction(1, nativePrintString);
+    _ = try vm.takeObjectOwnership(native_print);
     const native_print_string_index = try vm.addConstant(.{ .Object = native_print });
 
     _ = try main_fn.data.Function.chunk.addInstruction(.{ .LoadConstant = str_index }, 0);
@@ -81,18 +84,10 @@ pub const VirtualMachine = struct {
         };
     }
 
+    // All the objects are owned by the objects pool
     pub fn deinit(self: *VirtualMachine) void {
         self.frames.deinit();
         self.stack.deinit();
-        for (self.constants.items) |v| {
-            switch (v) {
-                .Object => |object| {
-                    object.deinit();
-                    self.runtime_allocator.destroy(object);
-                },
-                else => {},
-            }
-        }
         self.constants.deinit();
         for (self.objects.items) |object| {
             object.deinit();
