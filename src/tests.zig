@@ -266,7 +266,7 @@ test "interpret set global" {
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
-    try std.testing.expectEqual(@as(?main.Value, .True), vm.globals.get("nice"));
+    try std.testing.expectEqual(@as(?main.Value, .True), vm.globals.get(fn_name));
 }
 
 test "interpret read global" {
