@@ -55,6 +55,19 @@ fn nativePrintString(vm: *VirtualMachine, arity: usize) Value {
 
 pub const TypeMismatchError = error.TypeMismatch;
 
+pub const GlobalsHashMapContext = struct {
+    pub fn hash(self: @This(), s: *Object) u64 {
+        _ = self;
+        return std.hash_map.hashString(s.*.data.String.items);
+    }
+
+    pub fn eql(self: @This(), a: *Object, b: *Object) bool {
+        _ = self;
+        return std.hash_map.eqlString(a.*.data.String.items, b.*.data.String.items);
+    }
+};
+pub const GlobalsHashMap = std.HashMap(*Object, Value, GlobalsHashMapContext, std.hash_map.default_max_load_percentage);
+
 pub const VirtualMachine = struct {
     allocator: std.mem.Allocator,
     runtime_allocator: std.mem.Allocator,
@@ -68,7 +81,7 @@ pub const VirtualMachine = struct {
     upvalues: std.SinglyLinkedList(*Object),
     // That array list is here just to track the allocated memory
     objects: std.ArrayList(*Object),
-    globals: std.StringHashMap(Value),
+    globals: GlobalsHashMap,
 
     pub fn init(inner_allocator: std.mem.Allocator, runtime_allocator: std.mem.Allocator) !VirtualMachine {
         const stack = try std.ArrayList(Value).initCapacity(inner_allocator, 1024 * 1024 * 16);
@@ -80,7 +93,7 @@ pub const VirtualMachine = struct {
             .constants = std.ArrayList(Value).init(inner_allocator),
             .upvalues = std.SinglyLinkedList(*Object){},
             .objects = std.ArrayList(*Object).init(inner_allocator),
-            .globals = std.StringHashMap(Value).init(inner_allocator),
+            .globals = GlobalsHashMap.init(inner_allocator),
         };
     }
 
@@ -842,7 +855,8 @@ fn interpretStoreGlobal(vm: *VirtualMachine, index: usize) !void {
             return error.InvalidGlobalName;
         },
     };
-    try vm.globals.put(name.items, vm.stack.items[vm.stack.items.len - 1]);
+    _ = name;
+    try vm.globals.put(object, vm.stack.items[vm.stack.items.len - 1]);
 }
 
 fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
@@ -861,7 +875,8 @@ fn interpretLoadGlobal(vm: *VirtualMachine, index: usize) !void {
             return error.InvalidGlobalName;
         },
     };
-    const value = vm.globals.get(name.items) orelse {
+    _ = name;
+    const value = vm.globals.get(object) orelse {
         std.debug.print("Undefined global variable\n", .{});
         return error.UndefinedGlobalVariable;
     };
