@@ -2,18 +2,17 @@ const std = @import("std");
 const gc = @import("gc.zig");
 
 pub fn main() !void {
-    var gca = gc.GarbageCollector(.{}).init();
-    defer {
-        _ = gca.deinit();
-    }
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const deinit_status = gpa.deinit();
         _ = deinit_status;
     }
-
     const allocator = gpa.allocator();
+
+    var gca = gc.GarbageCollector(.{}).init(allocator);
+    defer {
+        _ = gca.deinit();
+    }
     const runtime_allocator = gca.allocator();
 
     var vm = try VirtualMachine.init(allocator, runtime_allocator);
@@ -376,7 +375,7 @@ pub const Object = struct {
         },
         Closure: struct {
             allocator: std.mem.Allocator,
-            function: *const Object,
+            function: *Object,
             upvalues: std.ArrayList(*Object),
         },
         // Upvalues can point to values on the stack, or they can own the value.
@@ -409,7 +408,7 @@ pub const Object = struct {
         };
     }
 
-    pub fn closure(allocator: std.mem.Allocator, f: *const Object, upvalues: std.ArrayList(*Object)) Object {
+    pub fn closure(allocator: std.mem.Allocator, f: *Object, upvalues: std.ArrayList(*Object)) Object {
         return Object{
             .marked = false,
             .data = .{ .Closure = .{
