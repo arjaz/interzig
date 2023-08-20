@@ -78,8 +78,8 @@ pub const VirtualMachine = struct {
     // They're global but the upvalues are closed when returning from a function.
     // Closing an upvalue means moving it and all preceding upvalues to the heap.
     upvalues: std.SinglyLinkedList(*Object),
-    // That array list is here just to track the allocated memory
-    objects: std.ArrayList(*Object),
+    // That list is here to track the allocated memory
+    objects: std.SinglyLinkedList(*Object),
     globals: GlobalsHashMap,
 
     pub fn init(inner_allocator: std.mem.Allocator, runtime_allocator: std.mem.Allocator) !VirtualMachine {
@@ -91,7 +91,7 @@ pub const VirtualMachine = struct {
             .stack = stack,
             .constants = std.ArrayList(Value).init(inner_allocator),
             .upvalues = std.SinglyLinkedList(*Object){},
-            .objects = std.ArrayList(*Object).init(inner_allocator),
+            .objects = std.SinglyLinkedList(*Object){},
             .globals = GlobalsHashMap.init(inner_allocator),
         };
     }
@@ -101,12 +101,15 @@ pub const VirtualMachine = struct {
         self.frames.deinit();
         self.stack.deinit();
         self.constants.deinit();
-        for (self.objects.items) |object| {
-            object.deinit();
-            self.runtime_allocator.destroy(object);
-        }
-        self.objects.deinit();
         self.globals.deinit();
+
+        var object = self.objects.first;
+        while (object) |node| {
+            node.data.deinit();
+            object = node.next;
+            self.runtime_allocator.destroy(node.data);
+            self.allocator.destroy(node);
+        }
 
         var it = self.upvalues.first;
         while (it) |node| {
@@ -138,8 +141,12 @@ pub const VirtualMachine = struct {
 
     pub fn printObjects(self: *VirtualMachine) void {
         std.debug.print("=== Objects ===\n", .{});
-        for (self.objects.items, 0..) |object, offset| {
-            object.print(offset);
+        var it = self.objects.first;
+        var i: usize = 0;
+        while (it) |node| {
+            node.data.print(i);
+            it = node.next;
+            i += 1;
         }
     }
 
@@ -161,9 +168,10 @@ pub const VirtualMachine = struct {
         return self.constants.items.len - 1;
     }
 
-    pub fn takeObjectOwnership(self: *VirtualMachine, object: *Object) !usize {
-        try self.objects.append(object);
-        return self.objects.items.len - 1;
+    pub fn takeObjectOwnership(self: *VirtualMachine, object: *Object) !void {
+        var node = try self.allocator.create(std.SinglyLinkedList(*Object).Node);
+        node.data = object;
+        self.objects.prepend(node);
     }
 
     pub fn interpret(self: *VirtualMachine) !Value {
@@ -273,9 +281,6 @@ pub const VirtualMachine = struct {
                 },
                 .LoadConstant => |index| {
                     try interpretLoadConstant(self, index);
-                },
-                .LoadObject => |index| {
-                    try interpretLoadObject(self, index);
                 },
                 .Jump => |offset| {
                     try interpretJump(frame, offset);
@@ -559,8 +564,6 @@ pub const OpCode = union(enum) {
     LoadLocal: usize,
     // Loads a constant from the constant pool and pushes it onto the stack.
     LoadConstant: usize,
-    // Loads an object from the object pool and pushes it onto the stack.
-    LoadObject: usize,
     // Jumps unconditionally. The jump offset is relative to the current instruction.
     Jump: u32,
     // Jumps if the value on the stack is falsey. The jump offset is relative to the current instruction.
@@ -643,9 +646,6 @@ pub const Chunk = struct {
                 },
                 .LoadConstant => {
                     std.debug.print("{x:4}    {d} load constant {d}\n", .{ offset, line, instruction.LoadConstant });
-                },
-                .LoadObject => {
-                    std.debug.print("{x:4}    {d} load object {d}\n", .{ offset, line, instruction.LoadObject });
                 },
                 .Jump => {
                     std.debug.print("{x:4}    {d} jump {d}\n", .{ offset, line, instruction.Jump });
@@ -893,11 +893,6 @@ fn interpretLoadLocal(vm: *VirtualMachine, frame: *CallFrame, index: usize) !voi
 fn interpretLoadConstant(vm: *VirtualMachine, index: usize) !void {
     const v = vm.constants.items[index];
     vm.stack.appendAssumeCapacity(v);
-}
-
-fn interpretLoadObject(vm: *VirtualMachine, index: usize) !void {
-    const object = vm.objects.items[index];
-    vm.stack.appendAssumeCapacity(.{ .Object = object });
 }
 
 fn interpretAdd(vm: *VirtualMachine) !void {
