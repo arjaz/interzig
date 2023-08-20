@@ -24,7 +24,7 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
         stack: ?*std.ArrayList(Value) = null,
         frames: ?*std.ArrayList(CallFrame) = null,
         upvalues: ?*std.SinglyLinkedList(*Object) = null,
-        objects: ?*std.ArrayList(*Object) = null,
+        objects: ?*std.SinglyLinkedList(*Object) = null,
         constants: ?*std.ArrayList(Value) = null,
         globals: ?*GlobalsHashMap = null,
 

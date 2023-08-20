@@ -34,7 +34,7 @@ test "interpret return" {
     const nil = try vm.addConstant(.Nil);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -58,7 +58,7 @@ test "interpret constant" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -83,7 +83,7 @@ test "interpret 1 + 2" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -111,7 +111,7 @@ test "interpret 1 - 2" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -139,7 +139,7 @@ test "interpret 10u64 - 7u64" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -167,7 +167,7 @@ test "interpret not(nil)" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -193,7 +193,7 @@ test "interpret not(10.7)" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -219,7 +219,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -249,13 +249,13 @@ test "interpret set global" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
     const true_index = try vm.addConstant(.True);
     const fn_name = try vm.stringFromU8Slice("nice");
-    _ = try vm.takeObjectOwnership(fn_name);
+    try vm.takeObjectOwnership(fn_name);
     const global_constant_index = try vm.addConstant(.{ .Object = fn_name });
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = global_constant_index }, 0);
@@ -279,13 +279,13 @@ test "interpret read global" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
     const true_index = try vm.addConstant(.True);
     const fn_name = try vm.stringFromU8Slice("nice");
-    _ = try vm.takeObjectOwnership(fn_name);
+    try vm.takeObjectOwnership(fn_name);
     const global_constant_index = try vm.addConstant(.{ .Object = fn_name });
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.{ .StoreGlobal = global_constant_index }, 0);
@@ -310,7 +310,7 @@ test "interpret jump over one instruction" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -336,7 +336,7 @@ test "interpret jump if false with nil on the stack" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -362,7 +362,7 @@ test "interpret jump if false with true on the stack" {
     defer vm.deinit();
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -389,7 +389,7 @@ test "interpret jump back" {
 
     const nil_index = try vm.addConstant(.Nil);
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const chunk = &main_fn.data.Function.chunk;
@@ -419,7 +419,7 @@ test "interpret fn call" {
     const true_index = try vm.addConstant(.True);
 
     const just_true_fn_object = try vm.namedFunction("justTrue", 0, 0);
-    _ = try vm.takeObjectOwnership(just_true_fn_object);
+    try vm.takeObjectOwnership(just_true_fn_object);
     const just_true_fn_index = try vm.addConstant(.{ .Object = just_true_fn_object });
     const just_true_fn = vm.constants.items[just_true_fn_index].Object;
     const just_true_chunk = &just_true_fn.data.Function.chunk;
@@ -427,7 +427,7 @@ test "interpret fn call" {
     _ = try just_true_chunk.addInstruction(.Return, 0);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -456,7 +456,7 @@ test "interpret closure call" {
     const true_index = try vm.addConstant(.True);
 
     const just_true_fn_object = try vm.namedFunction("justTrue", 0, 0);
-    _ = try vm.takeObjectOwnership(just_true_fn_object);
+    try vm.takeObjectOwnership(just_true_fn_object);
     const just_true_fn_index = try vm.addConstant(.{ .Object = just_true_fn_object });
     const just_true_fn = vm.constants.items[just_true_fn_index].Object;
     const just_true_chunk = &just_true_fn.data.Function.chunk;
@@ -464,7 +464,7 @@ test "interpret closure call" {
     _ = try just_true_chunk.addInstruction(.Return, 0);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -513,7 +513,7 @@ test "interpret closure call with an open local upvalue" {
     const true_index = try vm.addConstant(.True);
 
     const just_true_fn_object = try vm.namedFunction("justTrue", 0, 1);
-    _ = try vm.takeObjectOwnership(just_true_fn_object);
+    try vm.takeObjectOwnership(just_true_fn_object);
     const just_true_fn_index = try vm.addConstant(.{ .Object = just_true_fn_object });
     const just_true_fn = vm.constants.items[just_true_fn_index].Object;
     const just_true_chunk = &just_true_fn.data.Function.chunk;
@@ -521,7 +521,7 @@ test "interpret closure call with an open local upvalue" {
     _ = try just_true_chunk.addInstruction(.Return, 0);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -581,7 +581,7 @@ test "interpret closure call with an open non-local upvalue" {
     const true_index = try vm.addConstant(.True);
 
     const just_true2_fn_object = try vm.namedFunction("justTrue2", 0, 1);
-    _ = try vm.takeObjectOwnership(just_true2_fn_object);
+    try vm.takeObjectOwnership(just_true2_fn_object);
     const just_true2_fn_index = try vm.addConstant(.{ .Object = just_true2_fn_object });
     const just_true2_fn = vm.constants.items[just_true2_fn_index].Object;
     const just_true2_chunk = &just_true2_fn.data.Function.chunk;
@@ -589,7 +589,7 @@ test "interpret closure call with an open non-local upvalue" {
     _ = try just_true2_chunk.addInstruction(.Return, 0);
 
     const just_true_fn_object = try vm.namedFunction("justTrue", 0, 1);
-    _ = try vm.takeObjectOwnership(just_true_fn_object);
+    try vm.takeObjectOwnership(just_true_fn_object);
     const just_true_fn_index = try vm.addConstant(.{ .Object = just_true_fn_object });
     const just_true_fn = vm.constants.items[just_true_fn_index].Object;
     const just_true_chunk = &just_true_fn.data.Function.chunk;
@@ -600,7 +600,7 @@ test "interpret closure call with an open non-local upvalue" {
     _ = try just_true_chunk.addInstruction(.Return, 0);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -658,7 +658,7 @@ test "interpret closure call with a closed upvalue" {
     const true_index = try vm.addConstant(.True);
 
     const just_true_fn_object = try vm.namedFunction("just_true_fn", 0, 1);
-    _ = try vm.takeObjectOwnership(just_true_fn_object);
+    try vm.takeObjectOwnership(just_true_fn_object);
     const just_true_fn_index = try vm.addConstant(.{ .Object = just_true_fn_object });
     const just_true_fn = vm.constants.items[just_true_fn_index].Object;
     const just_true_chunk = &just_true_fn.data.Function.chunk;
@@ -666,7 +666,7 @@ test "interpret closure call with a closed upvalue" {
     _ = try just_true_chunk.addInstruction(.Return, 0);
 
     const just_true2_fn_object = try vm.namedFunction("just_true2_fn", 0, 0);
-    _ = try vm.takeObjectOwnership(just_true2_fn_object);
+    try vm.takeObjectOwnership(just_true2_fn_object);
     const just_true2_fn_index = try vm.addConstant(.{ .Object = just_true2_fn_object });
     const just_true2_fn = vm.constants.items[just_true2_fn_index].Object;
     const just_true2_chunk = &just_true2_fn.data.Function.chunk;
@@ -677,7 +677,7 @@ test "interpret closure call with a closed upvalue" {
     _ = try just_true2_chunk.addInstruction(.Return, 0);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -705,7 +705,7 @@ test "interpret calling 1" {
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
@@ -743,11 +743,11 @@ test "interpret native fn call" {
 
     var native = try vm.runtime_allocator.create(main.Object);
     native.* = main.Object.native(1, &nativeFnTest);
-    _ = try vm.takeObjectOwnership(native);
+    try vm.takeObjectOwnership(native);
 
     const native_index = try vm.addConstant(.{ .Object = native });
     const main_fn_object = try vm.namedFunction("main", 0, 0);
-    _ = try vm.takeObjectOwnership(main_fn_object);
+    try vm.takeObjectOwnership(main_fn_object);
     const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
     const main_fn = vm.constants.items[main_fn_index].Object;
     const main_chunk = &main_fn.data.Function.chunk;
