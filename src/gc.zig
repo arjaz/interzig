@@ -47,9 +47,30 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
 
             try self.markRoots();
             try self.traceReferences();
+            self.sweep();
 
             if (options.debug) {
                 std.debug.print("-- gc end\n", .{});
+            }
+        }
+
+        fn sweep(self: *Self) void {
+            var prev: ?*std.SinglyLinkedList(*Object).Node = null;
+            var it = self.objects.?.first;
+            while (it) |object| {
+                it = object.next;
+                if (object.data.marked) {
+                    object.data.marked = false;
+                    prev = object;
+                } else {
+                    _ = if (prev) |prev_node|
+                        prev_node.removeNext()
+                    else
+                        self.objects.?.popFirst();
+                    object.data.deinit();
+                    self.runtime_gpa.allocator().destroy(object.data);
+                    self.inner_allocator.destroy(object);
+                }
             }
         }
 
@@ -60,13 +81,6 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
         /// * the globals
         /// * the constants
         fn markRoots(self: *Self) !void {
-            std.debug.assert(self.stack != null);
-            std.debug.assert(self.frames != null);
-            std.debug.assert(self.upvalues != null);
-            std.debug.assert(self.objects != null);
-            std.debug.assert(self.constants != null);
-            std.debug.assert(self.globals != null);
-
             for (self.stack.?.items) |v| {
                 try self.markValue(v);
             }
@@ -257,4 +271,66 @@ test "an unreachable object is not marked" {
     try gca.markRoots();
     try gca.traceReferences();
     try std.testing.expect(memory.*.marked == false);
+}
+
+test "a reachable object is not collected" {
+    const inner_allocator = std.testing.allocator;
+    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
+    const gc_allocator = gca.allocator();
+
+    var vm = try VirtualMachine.init(inner_allocator, gc_allocator);
+    defer vm.deinit();
+    gca.link(&vm);
+
+    const s = std.ArrayList(u8).init(inner_allocator);
+
+    var memory = try gc_allocator.create(Object);
+    memory.* = Object.string(s);
+    try vm.takeObjectOwnership(memory);
+    _ = try vm.addConstant(.{ .Object = memory });
+
+    try gca.collectGarbage();
+    try std.testing.expect(vm.objects.first.?.data == memory);
+}
+
+test "a reachable object is unmarked" {
+    const inner_allocator = std.testing.allocator;
+    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
+    const gc_allocator = gca.allocator();
+
+    var vm = try VirtualMachine.init(inner_allocator, gc_allocator);
+    defer vm.deinit();
+    gca.link(&vm);
+
+    const s = std.ArrayList(u8).init(inner_allocator);
+
+    var memory = try gc_allocator.create(Object);
+    memory.* = Object.string(s);
+    try vm.takeObjectOwnership(memory);
+    _ = try vm.addConstant(.{ .Object = memory });
+
+    try gca.collectGarbage();
+    try std.testing.expect(memory.marked == false);
+}
+
+test "an unreachable object is collected" {
+    const inner_allocator = std.testing.allocator;
+    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
+    const gc_allocator = gca.allocator();
+
+    var vm = try VirtualMachine.init(inner_allocator, gc_allocator);
+    defer vm.deinit();
+    gca.link(&vm);
+
+    const s = std.ArrayList(u8).init(inner_allocator);
+
+    var memory = try gc_allocator.create(Object);
+    memory.* = Object.string(s);
+    try vm.takeObjectOwnership(memory);
+
+    try gca.collectGarbage();
+    try std.testing.expect(vm.objects.first == null);
 }
