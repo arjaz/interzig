@@ -3,12 +3,13 @@ const main = @import("main.zig");
 const gc = @import("gc.zig");
 
 test "add i64 constant" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
     defer vm.deinit();
+    gca.link(&vm);
     const index = try vm.addConstant(.{ .I64 = 42 });
     try std.testing.expectEqual(@as(usize, 1), vm.constants.items.len);
     try std.testing.expectEqual(@as(i64, 42), vm.constants.items[index].I64);
@@ -23,13 +24,14 @@ test "add return instruction" {
 }
 
 test "interpret return" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const nil = try vm.addConstant(.Nil);
 
@@ -49,13 +51,14 @@ test "interpret return" {
 }
 
 test "interpret constant" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -74,13 +77,14 @@ test "interpret constant" {
 }
 
 test "interpret 1 + 2" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -102,13 +106,14 @@ test "interpret 1 + 2" {
 }
 
 test "interpret 1 - 2" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -130,13 +135,14 @@ test "interpret 1 - 2" {
 }
 
 test "interpret 10u64 - 7u64" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -158,13 +164,14 @@ test "interpret 10u64 - 7u64" {
 }
 
 test "interpret not(nil)" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -184,13 +191,14 @@ test "interpret not(nil)" {
 }
 
 test "interpret not(10.7)" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -210,13 +218,14 @@ test "interpret not(10.7)" {
 }
 
 test "interpret (1 + 2.5) results in type mismatch" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -240,13 +249,14 @@ test "interpret (1 + 2.5) results in type mismatch" {
 }
 
 test "interpret set global" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -270,13 +280,14 @@ test "interpret set global" {
 }
 
 test "interpret read global" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -301,13 +312,14 @@ test "interpret read global" {
 }
 
 test "interpret jump over one instruction" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -327,13 +339,14 @@ test "interpret jump over one instruction" {
 }
 
 test "interpret jump if false with nil on the stack" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -353,13 +366,14 @@ test "interpret jump if false with nil on the stack" {
 }
 
 test "interpret jump if false with true on the stack" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn_object = try vm.namedFunction("main", 0, 0);
     try vm.takeObjectOwnership(main_fn_object);
@@ -379,13 +393,14 @@ test "interpret jump if false with true on the stack" {
 }
 
 test "interpret jump back" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const nil_index = try vm.addConstant(.Nil);
     const main_fn_object = try vm.namedFunction("main", 0, 0);
@@ -408,13 +423,14 @@ test "interpret jump back" {
 test "interpret fn call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const true_index = try vm.addConstant(.True);
 
@@ -445,13 +461,14 @@ test "interpret fn call" {
 test "interpret closure call" {
     // For this we will have a simple function that just returns true.
     // We will call it from main and expect the result to be true.
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const true_index = try vm.addConstant(.True);
 
@@ -502,13 +519,14 @@ test "interpret closure call with an open local upvalue" {
     //   capture local 0
     //   call
     //   return
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const true_index = try vm.addConstant(.True);
 
@@ -570,13 +588,14 @@ test "interpret closure call with an open non-local upvalue" {
     //   capture local 0
     //   call
     //   return
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const true_index = try vm.addConstant(.True);
 
@@ -647,13 +666,14 @@ test "interpret closure call with a closed upvalue" {
     //   call
     //   call
     //   return
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const true_index = try vm.addConstant(.True);
 
@@ -694,13 +714,14 @@ test "interpret closure call with a closed upvalue" {
 }
 
 test "interpret calling 1" {
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
 
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
@@ -732,13 +753,14 @@ fn nativeFnTest(vm: *main.VirtualMachine, arity: usize) main.Value {
 
 test "interpret native fn call" {
     // A simple function that accepts one argument and returns main.Value.True.
-    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(std.testing.allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
     var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
+    gca.link(&vm);
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
     var native = try vm.runtime_allocator.create(main.Object);
@@ -761,4 +783,36 @@ test "interpret native fn call" {
     const result = try vm.interpret();
     try std.testing.expectEqual(main.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+}
+
+test "interpret collecting an unused function" {
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
+    defer {
+        _ = gca.deinit();
+    }
+    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+
+    defer vm.deinit();
+    gca.link(&vm);
+
+    const collected_fn_object = try vm.namedFunction("unused", 0, 0);
+    try vm.takeObjectOwnership(collected_fn_object);
+
+    const one_index = try vm.addConstant(.{ .U64 = 1 });
+
+    const main_fn_object = try vm.namedFunction("main", 0, 0);
+    try vm.takeObjectOwnership(main_fn_object);
+    const main_fn_index = try vm.addConstant(.{ .Object = main_fn_object });
+    const main_fn = vm.constants.items[main_fn_index].Object;
+    const main_chunk = &main_fn.data.Function.chunk;
+    _ = try main_chunk.addInstruction(.{ .LoadConstant = one_index }, 0);
+    _ = try main_chunk.addInstruction(.Return, 0);
+
+    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    try vm.frames.append(frame);
+    _ = try vm.interpret();
+
+    try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
+    // The only object is the main function => the unused one was collected
+    try std.testing.expectEqual(@as(usize, 1), vm.objects.len());
 }

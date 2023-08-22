@@ -9,7 +9,7 @@ pub fn main() !void {
     }
     const allocator = gpa.allocator();
 
-    var gca = gc.GarbageCollector(.{}).init(allocator);
+    var gca = gc.GarbageCollector(.{ .stress = true, .debug = true }).init(allocator);
     defer {
         _ = gca.deinit();
     }
@@ -17,10 +17,15 @@ pub fn main() !void {
 
     var vm = try VirtualMachine.init(allocator, runtime_allocator);
     defer vm.deinit();
+    gca.link(&vm);
 
     const main_fn = try vm.namedFunction("main", 0, 0);
     _ = try vm.takeObjectOwnership(main_fn);
     _ = try vm.addConstant(.{ .Object = main_fn });
+
+    // This one is garbage collected
+    const test_fn = try vm.namedFunction("test", 0, 0);
+    _ = try vm.takeObjectOwnership(test_fn);
 
     const out_string = try vm.stringFromU8Slice("I love Helga\n");
     _ = try vm.takeObjectOwnership(out_string);

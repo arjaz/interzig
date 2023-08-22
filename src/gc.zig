@@ -10,10 +10,15 @@ pub const GarbageCollectorOptions = struct {
     debug: bool = false,
 };
 
+const GC_HEAP_GROW_FACTOR: usize = 2;
+
 pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
     return struct {
         const Self = @This();
         pub const Error = error{OutOfMemory};
+
+        bytes_allocated: usize = 0,
+        next_gc: usize = 1024 * 1024,
 
         // Stored GPA, used for runtime allocations, TODO: make in configurable
         runtime_gpa: std.heap.GeneralPurposeAllocator(.{}),
@@ -45,12 +50,21 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
                 std.debug.print("-- gc begin\n", .{});
             }
 
+            var before = self.bytes_allocated;
             try self.markRoots();
             try self.traceReferences();
             self.sweep();
 
+            self.next_gc = self.bytes_allocated * GC_HEAP_GROW_FACTOR;
+
             if (options.debug) {
                 std.debug.print("-- gc end\n", .{});
+                std.debug.print("   collected {} bytes (from {} to {}), next at {}\n", .{
+                    before - self.bytes_allocated,
+                    before,
+                    self.bytes_allocated,
+                    self.next_gc,
+                });
             }
         }
 
@@ -67,6 +81,9 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
                         prev_node.removeNext()
                     else
                         self.objects.?.popFirst();
+                    if (options.debug) {
+                        std.debug.print("{} is sweeped\n", .{object.data});
+                    }
                     object.data.deinit();
                     self.runtime_gpa.allocator().destroy(object.data);
                     self.inner_allocator.destroy(object);
@@ -141,7 +158,7 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
                 if (o.marked) return;
                 o.*.marked = true;
                 if (options.debug) {
-                    std.debug.print("{} marked\n", .{object.*});
+                    std.debug.print("{} marked\n", .{o});
                 }
 
                 var new_node = try self.inner_allocator.create(std.SinglyLinkedList(*Object).Node);
@@ -193,16 +210,29 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
 
         fn alloc(ctx: *anyopaque, len: usize, ptr_align: u8, ret_addr: usize) ?[*]u8 {
             const self: *Self = @ptrCast(@alignCast(ctx));
+
+            self.bytes_allocated += len;
+            if (self.bytes_allocated > self.next_gc or options.stress) {
+                self.collectGarbage() catch return null;
+            }
+
             return self.runtime_gpa.allocator().rawAlloc(len, ptr_align, ret_addr);
         }
 
         fn resize(ctx: *anyopaque, buf: []u8, buf_align: u8, new_len: usize, ret_addr: usize) bool {
             const self: *Self = @ptrCast(@alignCast(ctx));
+
+            self.bytes_allocated += new_len - buf.len;
+            if (self.bytes_allocated > self.next_gc or options.stress) {
+                self.collectGarbage() catch return false;
+            }
+
             return self.runtime_gpa.allocator().rawResize(buf, buf_align, new_len, ret_addr);
         }
 
         fn free(ctx: *anyopaque, buf: []u8, buf_align: u8, ret_addr: usize) void {
             const self: *Self = @ptrCast(@alignCast(ctx));
+            self.bytes_allocated -= buf.len;
             self.runtime_gpa.allocator().rawFree(buf, buf_align, ret_addr);
         }
     };
@@ -253,7 +283,7 @@ test "can mark a single owned object in the constant pool" {
 
 test "an unreachable object is not marked" {
     const inner_allocator = std.testing.allocator;
-    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    var gca = GarbageCollector(.{ .debug = false, .stress = true }).init(std.testing.allocator);
     defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
     const gc_allocator = gca.allocator();
 
@@ -275,7 +305,7 @@ test "an unreachable object is not marked" {
 
 test "a reachable object is not collected" {
     const inner_allocator = std.testing.allocator;
-    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    var gca = GarbageCollector(.{ .debug = false, .stress = true }).init(std.testing.allocator);
     defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
     const gc_allocator = gca.allocator();
 
@@ -296,7 +326,7 @@ test "a reachable object is not collected" {
 
 test "a reachable object is unmarked" {
     const inner_allocator = std.testing.allocator;
-    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    var gca = GarbageCollector(.{ .debug = false, .stress = true }).init(std.testing.allocator);
     defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
     const gc_allocator = gca.allocator();
 
@@ -317,7 +347,7 @@ test "a reachable object is unmarked" {
 
 test "an unreachable object is collected" {
     const inner_allocator = std.testing.allocator;
-    var gca = GarbageCollector(.{ .debug = false }).init(std.testing.allocator);
+    var gca = GarbageCollector(.{ .debug = false, .stress = true }).init(std.testing.allocator);
     defer std.testing.expect(gca.deinit() == std.heap.Check.ok) catch @panic("leak");
     const gc_allocator = gca.allocator();
 
