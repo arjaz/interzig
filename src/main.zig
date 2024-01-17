@@ -325,7 +325,7 @@ pub const VirtualMachine = struct {
         var it = self.upvalues.first;
         while (it) |node| {
             it = node.next;
-            var upvalue = node.data;
+            const upvalue = node.data;
             if (@intFromPtr(upvalue.data.Upvalue.Open.location) >= @intFromPtr(stackPointer)) {
                 upvalue.* = Object.closed_upvalue(upvalue.data.Upvalue.Open.location.*);
                 self.upvalues.remove(node);
@@ -341,7 +341,7 @@ pub const VirtualMachine = struct {
         for (slice) |byte| {
             try string.append(byte);
         }
-        var memory = try self.runtime_allocator.create(Object);
+        const memory = try self.runtime_allocator.create(Object);
         memory.* = Object.string(string);
         return memory;
     }
@@ -351,19 +351,19 @@ pub const VirtualMachine = struct {
         for (name) |byte| {
             try nameF.append(byte);
         }
-        var memory = try self.runtime_allocator.create(Object);
+        const memory = try self.runtime_allocator.create(Object);
         memory.* = Object.function(arity, upvalues, Chunk.init(self.allocator), nameF);
         return memory;
     }
 
     pub fn nativeFunction(self: *VirtualMachine, arity: u8, function: *const fn (*VirtualMachine, usize) Value) !*Object {
-        var memory = try self.runtime_allocator.create(Object);
+        const memory = try self.runtime_allocator.create(Object);
         memory.* = Object.native(arity, function);
         return memory;
     }
 
     pub fn closure(self: *VirtualMachine, function: *Object, upvalues: std.ArrayList(*Object)) !*Object {
-        var memory = try self.runtime_allocator.create(Object);
+        const memory = try self.runtime_allocator.create(Object);
         memory.* = Object.closure(self.runtime_allocator, function, upvalues);
         return memory;
     }
@@ -760,7 +760,7 @@ fn captureUpvalue(vm: *VirtualMachine, frame: *CallFrame, upvalues: *std.ArrayLi
             }
         }
     } else {
-        var memory = try vm.runtime_allocator.create(Object);
+        const memory = try vm.runtime_allocator.create(Object);
         const upvalue = frame.function.data.Closure.upvalues.items[u.index];
         memory.* = upvalue.*;
         try upvalues.append(memory);

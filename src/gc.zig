@@ -50,7 +50,7 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
                 std.debug.print("-- gc begin\n", .{});
             }
 
-            var before = self.bytes_allocated;
+            const before = self.bytes_allocated;
             try self.markRoots();
             try self.traceReferences();
             self.sweep();
@@ -180,7 +180,7 @@ pub fn GarbageCollector(comptime options: GarbageCollectorOptions) type {
         }
 
         pub fn init(allocator_: std.mem.Allocator) Self {
-            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            const gpa = std.heap.GeneralPurposeAllocator(.{}){};
             return Self{
                 .runtime_gpa = gpa,
                 .inner_allocator = allocator_,
@@ -244,7 +244,7 @@ test "can allocate and deallocate a small object" {
     const allocator = gca.allocator();
 
     const T = struct { a: u32 };
-    var memory = try allocator.create(T);
+    const memory = try allocator.create(T);
     memory.* = T{ .a = 10 };
     allocator.destroy(memory);
 }
@@ -270,7 +270,7 @@ test "can mark a single owned object in the constant pool" {
 
     const s = std.ArrayList(u8).init(inner_allocator);
 
-    var memory = try gc_allocator.create(Object);
+    const memory = try gc_allocator.create(Object);
     memory.* = Object.string(s);
     _ = try vm.takeObjectOwnership(memory);
     _ = try vm.addConstant(.{ .Object = memory });
@@ -293,7 +293,7 @@ test "an unreachable object is not marked" {
 
     const s = std.ArrayList(u8).init(inner_allocator);
 
-    var memory = try gc_allocator.create(Object);
+    const memory = try gc_allocator.create(Object);
     memory.* = Object.string(s);
     _ = try vm.takeObjectOwnership(memory);
 
@@ -315,7 +315,7 @@ test "a reachable object is not collected" {
 
     const s = std.ArrayList(u8).init(inner_allocator);
 
-    var memory = try gc_allocator.create(Object);
+    const memory = try gc_allocator.create(Object);
     memory.* = Object.string(s);
     try vm.takeObjectOwnership(memory);
     _ = try vm.addConstant(.{ .Object = memory });
@@ -336,7 +336,7 @@ test "a reachable object is unmarked" {
 
     const s = std.ArrayList(u8).init(inner_allocator);
 
-    var memory = try gc_allocator.create(Object);
+    const memory = try gc_allocator.create(Object);
     memory.* = Object.string(s);
     try vm.takeObjectOwnership(memory);
     _ = try vm.addConstant(.{ .Object = memory });
@@ -357,7 +357,7 @@ test "an unreachable object is collected" {
 
     const s = std.ArrayList(u8).init(inner_allocator);
 
-    var memory = try gc_allocator.create(Object);
+    const memory = try gc_allocator.create(Object);
     memory.* = Object.string(s);
     try vm.takeObjectOwnership(memory);
 

@@ -763,7 +763,7 @@ test "interpret native fn call" {
     gca.link(&vm);
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
-    var native = try vm.runtime_allocator.create(main.Object);
+    const native = try vm.runtime_allocator.create(main.Object);
     native.* = main.Object.native(1, &nativeFnTest);
     try vm.takeObjectOwnership(native);
 
