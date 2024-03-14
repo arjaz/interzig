@@ -1,9 +1,9 @@
 const std = @import("std");
-const VirtualMachine = @import("main.zig").VirtualMachine;
-const Value = @import("main.zig").Value;
-const Object = @import("main.zig").Object;
-const CallFrame = @import("main.zig").CallFrame;
-const GlobalsHashMap = @import("main.zig").GlobalsHashMap;
+const VirtualMachine = @import("vm.zig").VirtualMachine;
+const Value = @import("vm.zig").Value;
+const Object = @import("vm.zig").Object;
+const CallFrame = @import("vm.zig").CallFrame;
+const GlobalsHashMap = @import("vm.zig").GlobalsHashMap;
 
 pub const GarbageCollectorOptions = struct {
     stress: bool = false,

@@ -1,5 +1,6 @@
 const std = @import("std");
 const main = @import("main.zig");
+const machine = @import("vm.zig");
 const gc = @import("gc.zig");
 
 test "add i64 constant" {
@@ -7,7 +8,7 @@ test "add i64 constant" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
     defer vm.deinit();
     gca.link(&vm);
     const index = try vm.addConstant(.{ .I64 = 42 });
@@ -16,11 +17,11 @@ test "add i64 constant" {
 }
 
 test "add return instruction" {
-    var chunk = main.Chunk.init(std.testing.allocator);
+    var chunk = machine.Chunk.init(std.testing.allocator);
     defer chunk.deinit();
     _ = try chunk.addInstruction(.Return, 0);
     try std.testing.expectEqual(@as(usize, 1), chunk.code.items.len);
-    try std.testing.expectEqual(main.OpCode.Return, chunk.code.items[0]);
+    try std.testing.expectEqual(machine.OpCode.Return, chunk.code.items[0]);
 }
 
 test "interpret return" {
@@ -28,7 +29,7 @@ test "interpret return" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -43,10 +44,10 @@ test "interpret return" {
     _ = try chunk.addInstruction(.{ .LoadConstant = nil }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.Nil, result);
+    try std.testing.expectEqual(machine.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -55,7 +56,7 @@ test "interpret constant" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -69,10 +70,10 @@ test "interpret constant" {
     _ = try chunk.addInstruction(.{ .LoadConstant = index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value{ .I64 = 42 }, result);
+    try std.testing.expectEqual(machine.Value{ .I64 = 42 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -81,7 +82,7 @@ test "interpret 1 + 2" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -98,10 +99,10 @@ test "interpret 1 + 2" {
     _ = try chunk.addInstruction(.Add, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value{ .I64 = 3 }, result);
+    try std.testing.expectEqual(machine.Value{ .I64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -110,7 +111,7 @@ test "interpret 1 - 2" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -127,10 +128,10 @@ test "interpret 1 - 2" {
     _ = try chunk.addInstruction(.Sub, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value{ .I64 = -1 }, result);
+    try std.testing.expectEqual(machine.Value{ .I64 = -1 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -139,7 +140,7 @@ test "interpret 10u64 - 7u64" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -156,10 +157,10 @@ test "interpret 10u64 - 7u64" {
     _ = try chunk.addInstruction(.Sub, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value{ .U64 = 3 }, result);
+    try std.testing.expectEqual(machine.Value{ .U64 = 3 }, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -168,7 +169,7 @@ test "interpret not(nil)" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -183,10 +184,10 @@ test "interpret not(nil)" {
     _ = try chunk.addInstruction(.Not, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -195,7 +196,7 @@ test "interpret not(10.7)" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -210,10 +211,10 @@ test "interpret not(10.7)" {
     _ = try chunk.addInstruction(.Not, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.Nil, result);
+    try std.testing.expectEqual(machine.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -222,7 +223,7 @@ test "interpret (1 + 2.5) results in type mismatch" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -239,10 +240,10 @@ test "interpret (1 + 2.5) results in type mismatch" {
     _ = try chunk.addInstruction(.Add, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = vm.interpret() catch |err| {
-        try std.testing.expectEqual(err, main.TypeMismatchError);
+        try std.testing.expectEqual(err, machine.TypeMismatchError);
         return;
     };
     try std.testing.expect(false);
@@ -253,7 +254,7 @@ test "interpret set global" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -271,12 +272,12 @@ test "interpret set global" {
     _ = try chunk.addInstruction(.{ .StoreGlobal = global_constant_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
-    try std.testing.expectEqual(@as(?main.Value, .True), vm.globals.get(fn_name));
+    try std.testing.expectEqual(@as(?machine.Value, .True), vm.globals.get(fn_name));
 }
 
 test "interpret read global" {
@@ -284,7 +285,7 @@ test "interpret read global" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -304,10 +305,10 @@ test "interpret read global" {
     _ = try chunk.addInstruction(.{ .LoadGlobal = global_constant_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -316,7 +317,7 @@ test "interpret jump over one instruction" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -332,7 +333,7 @@ test "interpret jump over one instruction" {
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
@@ -343,7 +344,7 @@ test "interpret jump if false with nil on the stack" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -359,7 +360,7 @@ test "interpret jump if false with nil on the stack" {
     _ = try chunk.addInstruction(.{ .LoadConstant = nil_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
@@ -370,7 +371,7 @@ test "interpret jump if false with true on the stack" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -386,7 +387,7 @@ test "interpret jump if false with true on the stack" {
     _ = try chunk.addInstruction(.{ .LoadConstant = true_index }, 0);
     _ = try chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
@@ -397,7 +398,7 @@ test "interpret jump back" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -413,10 +414,14 @@ test "interpret jump back" {
     _ = try chunk.addInstruction(.Return, 0);
     _ = try chunk.addInstruction(.{ .JumpBack = 2 }, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{
+        .ip = @as([*]machine.OpCode, @ptrCast(&chunk.code.items[0])),
+        .function = main_fn,
+        .stack_base = 0,
+    };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.Nil, result);
+    try std.testing.expectEqual(machine.Value.Nil, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -427,7 +432,7 @@ test "interpret fn call" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -451,10 +456,10 @@ test "interpret fn call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -465,7 +470,7 @@ test "interpret closure call" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -490,10 +495,10 @@ test "interpret closure call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -523,7 +528,7 @@ test "interpret closure call with an open local upvalue" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -550,11 +555,11 @@ test "interpret closure call with an open local upvalue" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
-    // the stack is not empty because we have one local variable in main.
+    try std.testing.expectEqual(machine.Value.True, result);
+    // the stack is not empty because we have one local variable in machine.
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
@@ -592,7 +597,7 @@ test "interpret closure call with an open non-local upvalue" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -630,11 +635,11 @@ test "interpret closure call with an open non-local upvalue" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
-    // the stack is not empty because we have one local variable in main.
+    try std.testing.expectEqual(machine.Value.True, result);
+    // the stack is not empty because we have one local variable in machine.
     try std.testing.expectEqual(@as(usize, 1), vm.stack.items.len);
 }
 
@@ -670,7 +675,7 @@ test "interpret closure call with a closed upvalue" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -706,10 +711,10 @@ test "interpret closure call with a closed upvalue" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -718,7 +723,7 @@ test "interpret calling 1" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -734,7 +739,7 @@ test "interpret calling 1" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = vm.interpret() catch |err| {
         try std.testing.expectEqual(err, error.TypeMismatch);
@@ -743,7 +748,7 @@ test "interpret calling 1" {
     try std.testing.expect(false);
 }
 
-fn nativeFnTest(vm: *main.VirtualMachine, arity: usize) main.Value {
+fn nativeFnTest(vm: *machine.VirtualMachine, arity: usize) machine.Value {
     var i: usize = 0;
     while (i < arity) : (i += 1) {
         _ = vm.stack.pop();
@@ -752,19 +757,19 @@ fn nativeFnTest(vm: *main.VirtualMachine, arity: usize) main.Value {
 }
 
 test "interpret native fn call" {
-    // A simple function that accepts one argument and returns main.Value.True.
+    // A simple function that accepts one argument and returns machine.Value.True.
     var gca = gc.GarbageCollector(.{ .stress = true, .debug = false }).init(std.testing.allocator);
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
     const one_index = try vm.addConstant(.{ .U64 = 1 });
 
-    const native = try vm.runtime_allocator.create(main.Object);
-    native.* = main.Object.native(1, &nativeFnTest);
+    const native = try vm.runtime_allocator.create(machine.Object);
+    native.* = machine.Object.native(1, &nativeFnTest);
     try vm.takeObjectOwnership(native);
 
     const native_index = try vm.addConstant(.{ .Object = native });
@@ -778,10 +783,10 @@ test "interpret native fn call" {
     _ = try main_chunk.addInstruction(.Call, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     const result = try vm.interpret();
-    try std.testing.expectEqual(main.Value.True, result);
+    try std.testing.expectEqual(machine.Value.True, result);
     try std.testing.expectEqual(@as(usize, 0), vm.stack.items.len);
 }
 
@@ -790,7 +795,7 @@ test "interpret collecting an unused function" {
     defer {
         _ = gca.deinit();
     }
-    var vm = try main.VirtualMachine.init(std.testing.allocator, gca.allocator());
+    var vm = try machine.VirtualMachine.init(std.testing.allocator, gca.allocator());
 
     defer vm.deinit();
     gca.link(&vm);
@@ -808,7 +813,7 @@ test "interpret collecting an unused function" {
     _ = try main_chunk.addInstruction(.{ .LoadConstant = one_index }, 0);
     _ = try main_chunk.addInstruction(.Return, 0);
 
-    const frame = main.CallFrame{ .ip = @as([*]main.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
+    const frame = machine.CallFrame{ .ip = @as([*]machine.OpCode, @ptrCast(&main_chunk.code.items[0])), .function = main_fn, .stack_base = 0 };
     try vm.frames.append(frame);
     _ = try vm.interpret();
 
